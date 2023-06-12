@@ -41,6 +41,15 @@ class Stress_Funcs:
         Tbed = coeff * (1 + (self.W*math.tan(self.theta))/ (self.W * math.tan(self.theta) - 2*self.D))
         
         return Tbed
+    
+    def calc_psi_bed (self, Fw):
+       psi_bed = 0.5 * self.rho * self.g * (1-Fw) * ((self.W*math.tan(self.theta) / (self.W*math.tan(self.theta) - 2*self.D)))
+       return psi_bed
+
+    def calc_psi_bank(self, Fw):
+        psi_bank = self.rho * self.g * (Fw/2) * ((self.W/self.D) * math.sin(self.theta) - math.cos(self.theta))
+        return psi_bank
+                                            
         
 
 #%%
