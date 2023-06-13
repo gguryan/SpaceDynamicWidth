@@ -109,7 +109,6 @@ dQsdx_origall = [np.nan]
 # Deposition rate; in this formulation (only) stays constant since Qs and Qw stay constant.
 Ds = Qs / Qw * V  # Note that this is the only place Qs goes into the calculation, which seems odd to me.
 
-Ds = Qs / Qw * V  # Note that this is the only place Qs goes into the calculation, which seems odd to me.
 
 #maxitnum = 100  # Set the maximum number of iterations
 
