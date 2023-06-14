@@ -157,17 +157,19 @@ w = np.ones((nx, ny)) * wr_init
 w = mg.add_field("channel__bottom_width", w, at="node")
 
 
-ws = #TODO
+ws = w = np.ones((nx, ny)) * ws_init #TODO what is ws_init??
 ws = mg.add_ones("channel__sed_width", ws, at="node")
 
 mg.add_ones('Psi_bed', at='node')
 mg.add_ones('Psi_bank', at='node')
 
-mg.add_zeros('bank__erosion', at='node')
+mg.add_zeros('bank__erosion', at='node') #TODO
+
+
+mg.add_zeros('flow__depth', at = 'node') #this is h #todo should there be an initial value/guess?
 
 
 
-mg.at_node['channel__width'][:] = mg.at_node['channel__width'] * W_init
 
 z[5] = 5.0
 z[6] = 4.0
