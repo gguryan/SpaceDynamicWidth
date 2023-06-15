@@ -1,17 +1,12 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jun 14 11:00:01 2023
 
-@author: gjg882
-"""
 model_name : 'Control'
 
 #configure model grid
-nx: 50
-ny: 50
-dx: 20 
+nx: 20
+ny: 20
+dx: 100
 
-H_init: 0.68
+H_init: 1
 
 m_sp : 0.5
 n_sp : 1.0
@@ -32,4 +27,4 @@ space_dt: 40.
 space_uplift : .001 
 
 #years
-space_runtime : 1000
+space_runtime : 300000

@@ -30,7 +30,16 @@ from landlab.components import (FlowAccumulator,
 
 
 #Inputs to create RasterModelGrid
-inputs = load_params('fixed_width_inputs_ctrl.txt')
+inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/fixed_width_inputs_test.txt')
+#output file path
+ds_file = 'FixedWidthTest_test.nc'
+
+
+#inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/fixed_width_inputs_ctrl.txt')
+#output file path
+#ds_file = 'FixedWidthTest_ctrl.nc'
+
+#%%
 
 model_name = inputs['model_name']
 
@@ -41,8 +50,13 @@ H_init=inputs['H_init']
 
 
 K1 = inputs['K_br']
-K3 = 5e-5 #TODO CHANGE THIS
+K_sed = inputs['K_sed']
+
+
+K3 = .001 #TODO CHANGE THIS
+
 K2 = K1*K3
+K2_sed = K_sed*K3
 
 m_sp = inputs['m_sp']
 n_sp = inputs['n_sp']
@@ -62,8 +76,12 @@ mg.at_node['soil__depth'][:] = H_init
 w = np.zeros((nx, ny))
 w = mg.add_field("channel__width", w, at="node")
 
-K = np.zeros((nx, ny))
+K = np.ones((nx, ny)) * K1
 K = mg.add_field("K", K, at="node")
+
+K_sed = np.ones((nx, ny))
+K_sed = mg.add_field("K_sed", K_sed, at="node")
+
 
 
 mg.set_watershed_boundary_condition_outlet_id(0, 
@@ -71,13 +89,18 @@ mg.set_watershed_boundary_condition_outlet_id(0,
                                               -9999.)
 
 #Check boundary conditions
-#imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
+imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 
+
+#%%
+#instantiate flow router
+fr = PriorityFloodFlowRouter(mg, flow_metric='D8', suppress_out = True)
+fr.run_one_step()
 
 #%%
 
 #Inputs to instantiate SPACE
-K_sed = inputs['K_sed']
+
 F_f = inputs['F_f']
 phi = inputs['phi']
 H_star = inputs['H_star']
@@ -113,7 +136,7 @@ out_times = np.arange(0, space_runtime+save_interval, save_interval)
 out_count = len(out_times)
 
 
-#%%
+#%%Set up xarray dataset to save output
 
 ds = xr.Dataset(
     data_vars={
@@ -143,7 +166,7 @@ ds = xr.Dataset(
         'surface_water__discharge':
         (('time', 'y', 'x'), np.empty((out_count, mg.shape[0], mg.shape[1])), {
             'units': 'm**3/s',
-            'long_name': 'Bedrock Erosion'
+            'long_name': 'Discharge'
             
         })
         
@@ -185,10 +208,8 @@ for of in out_fields:
 start_time = time.time()
 
  #output file path
-ds_file = 'C:/Users/gjg882/Desktop/Projects/SpaceDynamicWidth/ModelOutput/FixedWidthTest_ctrl.nc'
+ds_file = 'FixedWidthTest_test.nc'
 
-#instantiate flow router
-fr = PriorityFloodFlowRouter(mg, flow_metric='D8', suppress_out = True)
 
 
 elapsed_time = 0
@@ -198,6 +219,24 @@ for i in range(nts):
     #New priority flow router component
     fr.run_one_step()
     
+    if model_name == 'Test':
+    
+        #nonzero_Q = np.where(mg.at_node['surface_water__discharge'] > 0)
+        
+        mg.at_node['channel__width'][:] = K3 * (mg.at_node['surface_water__discharge']**0.5)
+        
+        #mg.at_node['K'][nonzero_Q]= K2/mg.at_node['channel__width'][nonzero_Q]
+        mg.at_node['K'][:]= K2/mg.at_node['channel__width'][:]
+
+        
+        #mg.at_node['K_sed'][nonzero_Q]= K2_sed/mg.at_node['channel__width'][nonzero_Q]
+        mg.at_node['K_sed'][:] = K2_sed/mg.at_node['channel__width'][:]
+        
+    
+        #Update space K values
+        space.K_br = mg.at_node['K']
+        space.K_sed = mg.at_node['K_sed']
+        
     #erode with space
     _ = space.run_one_step(dt=space_dt)
     
@@ -209,10 +248,8 @@ for i in range(nts):
     #Recalculate topographic elevation to account for rock uplift
     mg.at_node['topographic__elevation'][:] = \
         mg.at_node['bedrock__elevation'][:] + mg.at_node['soil__depth'][:]
+      
 
-    #Update space K values
-    space.K_br = mg.at_node['K_sp']
-    
     if elapsed_time %save_interval== 0:
         
         ds_ind = int((elapsed_time/save_interval))
@@ -229,4 +266,26 @@ end_time = time.time()
 loop_time = round((end_time - start_time) / 60)
 print('Loop time =', loop_time)
 
+#%%
+
+plt.figure()
+imshow_grid(mg, 'topographic__elevation')
+plt.title('Explicit Width ' + model_name)
+
+#%%
+
+plt.figure()
+imshow_grid(mg, 'channel__width', colorbar_label='Channel Width (m)')
+plt.title('Explicit Width ' + model_name)
+#%%'
+
+plt.figure()
+ds.surface_water__discharge.sel(time=300000).plot()
+plt.title("Discharge " + model_name)
+
+#%%
+
+plt.figure()
+imshow_grid(mg, 'K')
+plt.title('K')
 
