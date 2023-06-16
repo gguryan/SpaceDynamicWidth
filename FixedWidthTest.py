@@ -30,9 +30,14 @@ from landlab.components import (FlowAccumulator,
 
 
 #Inputs to create RasterModelGrid
-inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/fixed_width_inputs_test.txt')
+#inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/fixed_width_inputs_test.txt')
 #output file path
-ds_file = 'FixedWidthTest_test.nc'
+#ds_file = 'FixedWidthTest_test.nc'
+
+inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/fixed_width_inputs_test_m0.txt')
+#output file path
+ds_file = 'FixedWidthTest_test_m0.nc'
+
 
 
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/fixed_width_inputs_ctrl.txt')
@@ -215,9 +220,22 @@ for i in range(nts):
     #New priority flow router component
     fr.run_one_step()
     
+    if m_sp == 0:
+        
+        mg.at_node['channel__width'][mg.core_nodes] = K3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.5)
+        
+        mg.at_node['K'][mg.core_nodes]= (K2/mg.at_node['channel__width'][mg.core_nodes]) * mg.at_node['surface_water__discharge'][mg.core_nodes]
+        
+        mg.at_node['K_sed'][mg.core_nodes] = (K2_sed/mg.at_node['channel__width'][mg.core_nodes]) * mg.at_node['surface_water__discharge'][mg.core_nodes]
+        
+        #Update space K values
+        space.K_br = mg.at_node['K']
+        space.K_sed = mg.at_node['K_sed']
+    
     if model_name == 'Test':
     
         #nonzero_Q = np.where(mg.at_node['surface_water__discharge'] > 0)
+        
         
         #mg.at_node['channel__width'][mg.core_nodes] = K3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.5)
         mg.at_node['channel__width'][mg.core_nodes] = K3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.5)
@@ -288,14 +306,17 @@ if model_name == 'Test':
 #%%
 
 
+
 ds1 = xr.open_dataset('FixedWidthTest_ctrl.nc')
 ds2 = xr.open_dataset('FixedWidthTest_test.nc')
+ds3 = xr.open_dataset('FixedWidthTest_test_m0.nc')
 
 ctrl_minus_test = ds1.topographic__elevation.sel(time=300000) - ds2.topographic__elevation.sel(time=300000)
+test_minus_m0 = ds2.topographic__elevation.sel(time=300000) - ds3.topographic__elevation.sel(time=300000)
 
 plt.figure(figsize=(5,4))
-ctrl_minus_test.plot()
-plt.title("Control Elev Minus Test Elev")
+test_minus_m0.plot()
+plt.title("Test 1 Minus m=0")
 
 #%%
 
@@ -306,3 +327,10 @@ ds2.topographic__elevation.sel(time=300000).plot(ax=ax2, cmap='pink')
 
 ax1.set_title('Control')
 ax2.set_title('Explicit Width Test')
+
+
+
+#%%
+plt.figure()
+imshow_grid(mg, 'channel__width', colorbar_label='Channel Width (m)')
+plt.title('Explicit Width ' + model_name)

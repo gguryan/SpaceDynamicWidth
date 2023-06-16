@@ -1,0 +1,30 @@
+
+model_name : 'm=0 test'
+
+#configure model grid
+nx: 20
+ny: 20
+dx: 100
+
+H_init: 0
+
+m_sp : 0
+n_sp : 1.0
+
+K_br : 1e-5
+K_sed : 0.0005
+F_f : 0
+phi : 0.1
+H_star : 1.
+v_s : 3.0
+sp_crit_sed : 0
+sp_crit_br : 0 
+
+#years
+space_dt: 40.
+
+#m/yr
+space_uplift : .001 
+
+#years
+space_runtime : 300000
