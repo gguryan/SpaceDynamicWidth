@@ -89,7 +89,7 @@ mg.set_watershed_boundary_condition_outlet_id(0,
                                               -9999.)
 
 #Check boundary conditions
-imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
+#imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 
 
 #%%
@@ -116,7 +116,7 @@ space = SpaceLargeScaleEroder(mg,
            H_star = H_star,
            v_s = v_s,
            m_sp = m_sp,
-           n_sp = m_sp,
+           n_sp = n_sp,
            sp_crit_sed = sp_crit_sed,
            sp_crit_br = sp_crit_br)
 
@@ -207,10 +207,6 @@ for of in out_fields:
 
 start_time = time.time()
 
- #output file path
-ds_file = 'FixedWidthTest_test.nc'
-
-
 
 elapsed_time = 0
 
@@ -223,14 +219,15 @@ for i in range(nts):
     
         #nonzero_Q = np.where(mg.at_node['surface_water__discharge'] > 0)
         
-        mg.at_node['channel__width'][:] = K3 * (mg.at_node['surface_water__discharge']**0.5)
+        #mg.at_node['channel__width'][mg.core_nodes] = K3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.5)
+        mg.at_node['channel__width'][mg.core_nodes] = K3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.5)
         
         #mg.at_node['K'][nonzero_Q]= K2/mg.at_node['channel__width'][nonzero_Q]
-        mg.at_node['K'][:]= K2/mg.at_node['channel__width'][:]
+        mg.at_node['K'][mg.core_nodes]= K2/mg.at_node['channel__width'][mg.core_nodes]
 
         
         #mg.at_node['K_sed'][nonzero_Q]= K2_sed/mg.at_node['channel__width'][nonzero_Q]
-        mg.at_node['K_sed'][:] = K2_sed/mg.at_node['channel__width'][:]
+        mg.at_node['K_sed'][mg.core_nodes] = K2_sed/mg.at_node['channel__width'][mg.core_nodes]
         
     
         #Update space K values
@@ -274,18 +271,38 @@ plt.title('Explicit Width ' + model_name)
 
 #%%
 
-plt.figure()
-imshow_grid(mg, 'channel__width', colorbar_label='Channel Width (m)')
-plt.title('Explicit Width ' + model_name)
-#%%'
+if model_name == 'Test':
 
-plt.figure()
-ds.surface_water__discharge.sel(time=300000).plot()
-plt.title("Discharge " + model_name)
+    plt.figure()
+    imshow_grid(mg, 'channel__width', colorbar_label='Channel Width (m)')
+    plt.title('Explicit Width ' + model_name)
+    
+    plt.figure()
+    imshow_grid(mg, 'K')
+    plt.title('K')
+    
+    plt.figure()
+    width_test = mg.at_node['K'][mg.core_nodes] * mg.at_node['channel__width'][mg.core_nodes]
+    plt.plot(width_test)
 
 #%%
 
-plt.figure()
-imshow_grid(mg, 'K')
-plt.title('K')
 
+ds1 = xr.open_dataset('FixedWidthTest_ctrl.nc')
+ds2 = xr.open_dataset('FixedWidthTest_test.nc')
+
+ctrl_minus_test = ds1.topographic__elevation.sel(time=300000) - ds2.topographic__elevation.sel(time=300000)
+
+plt.figure(figsize=(5,4))
+ctrl_minus_test.plot()
+plt.title("Control Elev Minus Test Elev")
+
+#%%
+
+
+fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4))
+ds1.topographic__elevation.sel(time=300000).plot(ax=ax1, cmap='pink')
+ds2.topographic__elevation.sel(time=300000).plot(ax=ax2, cmap='pink')
+
+ax1.set_title('Control')
+ax2.set_title('Explicit Width Test')
