@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Jun 16 17:47:10 2023
 
-@author: gjg882
-"""
 
 #grid dimensions
 dx : 100 #m
+nx: 3
+ny: 4
 
 
 #Lague Inputs
@@ -23,7 +20,7 @@ rho_sed : 2500 #Density of sediment, kg/m^3
 
 wr_init : 27.66  # Bedrock bed width, initial, in m.
 
-wrmin : 0.1 #Minimum channel width
+wr_min : 0.1 #Minimum channel width
 
 H_init : 0.68  # Initial sediment depth on bed, in m.
 

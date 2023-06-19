@@ -151,7 +151,7 @@ for itnum in range(maxitnum):  # iterate
     print(itnum)
 
     # Calculate width at water surface, and depth-averaged wetted width
-    wws = ws + 2 * h / np.tan(thetarad)  # width of sediment bed
+    wws = ws + 2 * h / np.tan(thetarad)  # ws = width of sediment bed
     wwa = (ws + wws) / 2  # depth-averaged width, used for normalizing discharge
 
     q = Qw / wwa

@@ -14,15 +14,40 @@ from landlab import RasterModelGrid
 
 #Need Q - comes from flow accumulator
 #%%
-#For a landlab model grid
 
+thetarad = math.radians(60)
+manning_n = .05
+ws = 28.445196366097893 #ws_init from Joel's original script\
+S = 0.01527
+
+h_initguess = 1 #placeholder for now, should normally be calculated
+h = h_initguess
+
+#Calculate estimated discharge for a given flow depth, h
+def Qwg(h, manning_n, ws, thetarad, S, Qw):
+    
+    Qwg = (1 / manning_n) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * (
+                (ws + 2 * h / math.sin(thetarad)) ** (-2 / 3)) * S ** 0.5
+
+    Q_error = np.abs(Qw - Qwg)
+    
+    return Q_error
+
+#%%
+
+Qw= 100
+func_args = (manning_n, ws, thetarad, S, Qw)
+h_root = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True)
+
+print(h_root)
+
+#%%
+
+#For a landlab model grid
 
 def DepthFinder(mg, thetarad, manning_n, Qwerrorfraction, error_tolfraction):
     
-    Qwerrorfraction = 10  # just a dummy initial value to start iterating for depth, reset before each iteration
-    manning_itnum = 0
-    htmepall = []
-    
+
     while Qwerrorfraction > error_tolfraction:
         
         Qw = mg.at_node['surface_water__discharge']
@@ -33,12 +58,10 @@ def DepthFinder(mg, thetarad, manning_n, Qwerrorfraction, error_tolfraction):
         #calculate estimated discharge, Qwg (Qw guess)
         Qwg = (1 / manning_n) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * (
                     (ws + 2 * h / math.sin(thetarad)) ** (-2 / 3)) * S ** 0.5  # Qwg for Qw guess, ie calculation
+        
         Qwerrorfraction = np.abs((Qw - Qwg) / Qw)
         
-        #Calculate the error
-        Qwerrorfraction = np.abs((Qw - Qwg) / Qw)
-        manning_itnum += 1
-        
+
     
     #Needed landlab fields
     #w_rock
