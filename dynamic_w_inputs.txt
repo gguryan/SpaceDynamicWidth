@@ -27,9 +27,9 @@ H_init : 0.68  # Initial sediment depth on bed, in m.
 
 U_initguess : 2.75 #initial guess to start iterating for velocity
 
-Kr: 0.000000000001        # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
-Ks: 0.00000000001        # Sediment entrainability, units 1/m
-Kbank: 0.000000000001     # Try order of magnitude smaller than Kr
+Kr: 0.0000000001        # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
+Ks: 0.00000001        # Sediment entrainability, units 1/m
+Kbank: 0.0000000001     # Try order of magnitude smaller than Kr
 n_sp: 1                  # Exponent on slope! Not Manning's n
 m_sp: 1                  # Exponent on drainage area - set to 1 since its subsumed into new K calculation
 Hstar: 1                  # e-folding length for cover effect, in m
