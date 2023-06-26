@@ -178,7 +178,7 @@ imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 #%%
 
 plt.figure()
-imshow_grid(mg, 'topographic__elevation')
+imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Initial Topo')
 #%%
 
@@ -238,7 +238,21 @@ calc_ws(mg, thetarad)
 
 #%%
 
-#idea - run 100 timesteps of fsc to develop slope/initial drianage
+#idea - run 100 timesteps of fsc to develop slope/initial drainage
+
+fsc = FastscapeEroder(mg)
+fsc_dt = 100
+
+fa = FlowAccumulator(mg)
+
+for i in range (1000):
+    fa.run_one_step()
+    fsc.run_one_step(fsc_dt)
+
+#%%
+plt.figure()
+imshow_grid(mg, 'topographic__elevation')
+plt.title("Topo after FSC")
 
 
 #%%
@@ -254,16 +268,12 @@ for i in range(nts):
     #flow routing
     fr.run_one_step()
 
-    
     #iterate through nodes, upstream to downstream to calculate flow depth
-    #not actually sure if order is important here
     nodes_ordered = mg.at_node["flow__upstream_node_order"]
     
-
     for j in range(len(nodes_ordered) - 1, -1, -1):
         
         print(j, S[j])
-        #h_initguess = Qw[j] /1000
         h_initguess = ws[j] / 3
         
         if S[j] > 0:
@@ -287,7 +297,7 @@ for i in range(nts):
     mg.at_node['depth_averaged__width'][:] = (mg.at_node['water_surface__width'][:] + mg.at_node['channel_sed__width'][:]) / 2
     
     #Caluclate normalized discharge
-    mg.at_node['normalized__discharge'][:] = mg.at_node['surface_water__discharge'][:] / mg.at_node['depth_averaged__width'][:]
+    #mg.at_node['normalized__discharge'][:] = mg.at_node['surface_water__discharge'][:] / mg.at_node['depth_averaged__width'][:]
 
     #Calculate Fw,shear stress partitioning between bed and banks
     mg.at_node['shear_stress__partitioning'][:] = 1.78 * (mg.at_node['water_surface__width'][:] / mg.at_node['flow__depth'][:] * np.sin(thetarad) - 2 * np.cos(thetarad) + 1.5) ** (-1.4)
@@ -330,7 +340,7 @@ for i in range(nts):
     
     dz_ad = np.zeros(mg.size('node'))
     dz_ad[mg.core_nodes] = space_uplift * space_dt
-    mg.at_node['bedrock__elevation'] += dz_ad
+    mg.at_node['bedrock__elevation'][:] += dz_ad
 
 
     #Recalculate topographic elevation to account for rock uplift

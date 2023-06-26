@@ -9,6 +9,7 @@ import numpy as np
 import math
 from matplotlib import pyplot as plt
 
+import time
 
 import scipy.optimize
 
@@ -34,13 +35,15 @@ from landlab.components import (FlowAccumulator,
                                 SpaceLargeScaleEroder)
 
 #%%
-inputs = load_params('dynamic_w_inputs.txt')
+inputs = load_params('dynamic_w_inputs_10x10.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #grid dimensions
 dx = inputs['dx']
 nx=inputs['nx']
 ny=inputs['ny']
+
+space_uplift=inputs['space_uplift']
 
 theta_deg = inputs['theta_deg']
 thetarad = math.radians(theta_deg) #convert to radians
@@ -56,7 +59,7 @@ wr_min = inputs['wr_min']  # Minimum bedrock bed width, code just stops if it ge
 
 U_initguess = inputs['U_initguess']  # Initial guess of avg velocity, in m/s, just to start the iteration process.
 
-h_initguess = 10 #TODO probably want to change this later
+#h_initguess = 60 #TODO probably want to change this later
 
 K_br = inputs["Kr"]
 K_sed = inputs["Ks"]
@@ -111,8 +114,7 @@ timestep_yrs = timestep_s / (60 * 60 * 24 * 365)
 
 mg = RasterModelGrid((nx, ny), dx)
 
-z = np.zeros((nx, ny))
-z = mg.add_field("topographic__elevation", z, at="node")
+
 
 mg.add_zeros('node', 'soil__depth') #Create a grid field for soil depth
 mg.at_node['soil__depth'][:] = H_init
@@ -146,15 +148,27 @@ K_bank_arr = np.ones((nx, ny)) * K_bank
 mg.add_field("K_bank", K_bank_arr, at="node")
 
 
-h = np.ones((nx, ny)) * h_initguess
+#h = np.ones((nx, ny)) * h_initguess
+h = np.zeros((nx, ny))
 mg.add_field('flow__depth', h, at = 'node') 
 
+#%%
 
 
-z[5] = 20.0
-z[6] = 10.0
+#Random initial roughness
+np.random.seed(seed = 200) #constant seed for constant random roughness
+z = mg.add_zeros('topographic__elevation', at='node')
+random_field = 0.01 * np.random.randn(mg.size('node'))
+z += random_field - random_field.min()
 
-mg.set_watershed_boundary_condition_outlet_id(7, 
+#All boundaries are closed except outlet node
+mg.set_closed_boundaries_at_grid_edges(bottom_is_closed=True,
+                                       left_is_closed=True,
+                                       right_is_closed=True,
+                                       top_is_closed=True)
+
+#Setting Node 0 (bottom left corner) as outlet node 
+mg.set_watershed_boundary_condition_outlet_id(0, 
                                               mg.at_node['topographic__elevation'],
                                               -9999.)
 
@@ -164,7 +178,8 @@ imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 #%%
 
 plt.figure()
-imshow_grid(mg, 'topographic__elevation')
+imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
+plt.title('Initial Topo')
 #%%
 
 fr = PriorityFloodFlowRouter(mg, flow_metric='D8', suppress_out = True)
@@ -172,6 +187,8 @@ fr.run_one_step()
 
 Qw = mg.at_node['surface_water__discharge']
 S = mg.at_node['topographic__steepest_slope']
+
+
 #%%
 
 space = SpaceLargeScaleEroder(mg,
@@ -187,7 +204,7 @@ space = SpaceLargeScaleEroder(mg,
            sp_crit_br = sp_crit_br)
 
 
-space_runtime = 10
+space_runtime = 400000
 space_dt = 10
 
 t = np.arange(0, space_runtime+space_dt, space_dt)
@@ -195,54 +212,82 @@ nts = len(t)
 
 #%%Define a funciton to calculate estimated discharge for a given flow depth, h, then compare estimated discharge to actual
 
+tan_thetar = np.tan(thetarad)
 
 def Qwg(h, manning_n, ws, thetarad, S, Qw):
     
-    Qwg = (1 / manning_n) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * (
-                (ws + 2 * h / math.sin(thetarad)) ** (-2 / 3)) * S ** 0.5
+    Qwg = (1 / manning_n) * ((h * (ws + h / tan_thetar)) ** (5 / 3)) * (
+                (ws + 2 * h / math.sin(thetarad)) ** ((-2) / 3)) * (S ** 0.5)
 
     Q_error = np.abs(Qw - Qwg)
     
     return Q_error
 
 
-
-
 def calc_ws(mg, thetarad):
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
 
+
+
+#%%
+
+#idea - run 100 timesteps of fsc to develop slope/initial drainage
+
+fsc = FastscapeEroder(mg)
+fsc_dt = 100
+
+fa = FlowAccumulator(mg)
+
+for i in range (100):
+    fa.run_one_step()
+    fsc.run_one_step(fsc_dt)
+    dz_ad = np.zeros(mg.size('node'))
+    dz_ad[mg.core_nodes] = .0001 * fsc_dt
+    mg.at_node['topographic__elevation'][:] += dz_ad
+    
+
+#%%
+plt.figure()
+imshow_grid(mg, 'topographic__elevation')
+plt.title("Topo after FSC")
+
+#%%
 
 #calculate initial sediment width
 calc_ws(mg, thetarad)
 
 #%%
 
-#print(mg.at_node['channel_sed__width'])
+start_time = time.time()
+elapsed_time = 0
 
-#%%
+
 
 #Main model loop
-
 for i in range(nts):
     
     #flow routing
     fr.run_one_step()
-    
-    
+
     #iterate through nodes, upstream to downstream to calculate flow depth
-    #not actually sure if order is important here
     nodes_ordered = mg.at_node["flow__upstream_node_order"]
     
-
-    for j in range(len(nodes_ordered) - 1, -1, -1):
-
-        func_args = (manning_n, ws[j], thetarad, S[j], Qw[j])
+    #for j in range(len(nodes_ordered) - 1, -1, -1):
+    for j in range(len(nodes_ordered)):
         
-        if mg.status_at_node[j] == 0: #don't operate on boundary nodes
-            mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True)
+        print(j, S[j])
+        h_initguess = ws[j] / 3
+        
+        if S[j] > 0:
+
+            func_args = (manning_n, ws[j], thetarad, S[j], Qw[j])
+        
+            print(func_args)
+        
+            if mg.status_at_node[j] == 0: #don't operate on boundary nodes
+                mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True, tol=0.01, maxiter=100)
     
-    print(h)
-    
+
     #TODO after optimizing for h, need to calculate hydraulic radius and velocity?
     #Joel's code does this, but rh and U don't actually get used elsewhere in model - just for looking at output?
 
@@ -254,7 +299,7 @@ for i in range(nts):
     mg.at_node['depth_averaged__width'][:] = (mg.at_node['water_surface__width'][:] + mg.at_node['channel_sed__width'][:]) / 2
     
     #Caluclate normalized discharge
-    mg.at_node['normalized__discharge'][:] = mg.at_node['surface_water__discharge'][:] / mg.at_node['depth_averaged__width'][:]
+    #mg.at_node['normalized__discharge'][:] = mg.at_node['surface_water__discharge'][:] / mg.at_node['depth_averaged__width'][:]
 
     #Calculate Fw,shear stress partitioning between bed and banks
     mg.at_node['shear_stress__partitioning'][:] = 1.78 * (mg.at_node['water_surface__width'][:] / mg.at_node['flow__depth'][:] * np.sin(thetarad) - 2 * np.cos(thetarad) + 1.5) ** (-1.4)
@@ -295,13 +340,30 @@ for i in range(nts):
     #Update channel sediment width, ws
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
+    dz_ad = np.zeros(mg.size('node'))
+    dz_ad[mg.core_nodes] = space_uplift * space_dt
+    mg.at_node['bedrock__elevation'][:] += dz_ad
+
+
+    #Recalculate topographic elevation to account for rock uplift
+    mg.at_node['topographic__elevation'][:] = \
+        mg.at_node['bedrock__elevation'][:] + mg.at_node['soil__depth'][:]
+        
+    
+    elapsed_time += space_dt
+    
+    if elapsed_time %1000 == 0:
+        
+        loop_time = round(((time.time()) - start_time) / 60)
+        print(elapsed_time, loop_time)
+        
 
     
     
 #%%
 
 plt.figure()
-imshow_grid(mg, 'channel_bedrock__width', colorbar_label='Channel Width(m)')    
+imshow_grid(mg, 'channel_bedrock__width')    
     
 #%%
 
@@ -312,4 +374,4 @@ imshow_grid(mg, 'channel_bedrock__width', colorbar_label='Channel Width(m)')
 # print(mg.at_node['flow__depth'])
 # =============================================================================
 
-sed_flux_in = mg.at_node['sediment__influx']
+#sed_flux_in = mg.at_node['sediment__influx']
