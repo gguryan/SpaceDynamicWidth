@@ -187,7 +187,7 @@ space = SpaceLargeScaleEroder(mg,
            sp_crit_br = sp_crit_br)
 
 
-space_runtime = 10
+space_runtime = 100
 space_dt = 10
 
 t = np.arange(0, space_runtime+space_dt, space_dt)
@@ -204,6 +204,7 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw):
     Q_error = np.abs(Qw - Qwg)
     
     return Q_error
+
 
 
 
@@ -294,6 +295,8 @@ for i in range(nts):
     
     #Update channel sediment width, ws
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+    
+    print(ws)
     
 
     
