@@ -192,7 +192,9 @@ space = SpaceLargeScaleEroder(mg,
            sp_crit_br = sp_crit_br)
 
 
+
 space_runtime = 1000 #todo change var names to model_runtime
+
 space_dt = 10
 
 t = np.arange(0, space_runtime+space_dt, space_dt)
@@ -350,9 +352,15 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw):
 
 #%%
 
+
 #TODO - TRY USING BRENT INSTEAD OF NEWTON SOLVER
 #SEE https://waterprogramming.wordpress.com/2016/08/18/root-finding-in-matlab-r-python-and-c/'
 #SEE ALSO https://www.engr.scu.edu/~emaurer/hydr-watres-book/flow-in-open-channels.html
+
+
+def calc_ws(mg, thetarad):
+    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+
 
 
 #%%
@@ -448,7 +456,9 @@ for i in range(nts):
     #Update channel sediment width, ws
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
+
     elapsed_time += space_dt
+
     
 
     
