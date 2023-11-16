@@ -10,13 +10,16 @@ import math
 from matplotlib import pyplot as plt
 
 
+
 import scipy.optimize
+
 
 import xarray as xr
 
 from lague_stress_funcs import Stress_Funcs
 
 from landlab import load_params
+
 
 from landlab import RasterModelGrid
 
@@ -34,7 +37,7 @@ from landlab.components import (FlowAccumulator,
                                 SpaceLargeScaleEroder)
 
 #%%
-inputs = load_params('dynamic_w_inputs.txt')
+inputs = load_params('dynamic_w_inputs_3x5.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #grid dimensions
@@ -56,7 +59,7 @@ wr_min = inputs['wr_min']  # Minimum bedrock bed width, code just stops if it ge
 
 U_initguess = inputs['U_initguess']  # Initial guess of avg velocity, in m/s, just to start the iteration process.
 
-h_initguess = 10 #TODO probably want to change this later
+h_initguess = 1.0 #TODO probably want to change this later
 
 K_br = inputs["Kr"]
 K_sed = inputs["Ks"]
@@ -150,16 +153,18 @@ h = np.ones((nx, ny)) * h_initguess
 mg.add_field('flow__depth', h, at = 'node') 
 
 
-
-z[5] = 20.0
-z[6] = 10.0
+#set initial elevations for middle two cells 
+z[5] = 1.0
+z[6] = 0.5
 
 mg.set_watershed_boundary_condition_outlet_id(7, 
                                               mg.at_node['topographic__elevation'],
                                               -9999.)
 
 
-imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
+#imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
+
+imshow_grid(mg, 'topographic__elevation')
 
 #%%
 
@@ -187,15 +192,151 @@ space = SpaceLargeScaleEroder(mg,
            sp_crit_br = sp_crit_br)
 
 
-space_runtime = 10
+space_runtime = 1000 #todo change var names to model_runtime
 space_dt = 10
 
 t = np.arange(0, space_runtime+space_dt, space_dt)
 nts = len(t)
 
+save_interval = 10
+
+out_times = np.arange(0, space_runtime+save_interval, save_interval)
+out_count = len(out_times)
+#%% Create Xarray dataset to save model output
+
+ds = xr.Dataset(
+    data_vars={
+        
+        'topographic__elevation':  (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': 'meters',  # dictionary with data attributes
+                'long_name': 'Topographic Elevation'
+            }),
+            
+        'channel_sed__width':
+            (('time', 'y', 'x'), np.empty((out_count, mg.shape[0], mg.shape[1])), {
+                'units': 'm',
+                'long_name': 'Channel Sediment Width'
+            }),
+        
+        'bedrock_erosion__rate' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': 'meters/yr',
+                'long_name': 'Bedrock Erosion Rate',
+                
+            }),    
+        
+        'bank_erosion__rate' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': 'meters/yr',
+                'long_name': 'Bank Erosion Rate',
+            
+            }),
+                
+        'flow__depth' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': 'meters',
+                'long_name': 'Flow Depth Manning Eqn',
+                
+            }),   
+        
+        'surface_water__discharge' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': 'm**3/s',
+                'long_name': 'Discharge',
+                
+            }), 
+        
+        'topographic__steepest_slope' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': '-',
+                'long_name': 'Topographic Steepest Slope',
+                
+            }),     
+        
+        'channel_bedrock__width' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': 'm',
+                'long_name': 'Channel Bedrock Width',
+                
+                })    
+    },
+        
+    coords={
+        'x': (
+            ('x'),  # tuple of dimensions
+            mg.x_of_node.reshape(
+                mg.shape)[0, :],  # 1-d array of coordinate data
+            {
+                'units': 'meters'
+            }),  # dictionary with data attributes
+        'y': (('y'), mg.y_of_node.reshape(mg.shape)[:, 1], {
+            'units': 'meters'
+        }),
+        'time': (('time'), out_times, {
+            'units': 'years',
+            'standard_name': 'time'
+        })
+    },
+    attrs=dict(inputs))
+   
+#list of model grid fields to save to output dataset    
+out_fields = ['topographic__elevation',
+              'channel_sed__width',
+              'bank_erosion__rate',
+              'bedrock_erosion__rate',
+              'flow__depth',
+              'surface_water__discharge',
+              'topographic__steepest_slope',
+              'channel_bedrock__width']
+              
+              
+              
+              
+
+
 #%%Define a funciton to calculate estimated discharge for a given flow depth, h, then compare estimated discharge to actual
 
+#calculate new width of sediment based on soil depth, bank ankle, and bedrock width
+def calc_ws(mg, thetarad):
+    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] 
+    + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
 
+#%%
+plt.figure()
+imshow_grid(mg, 'channel_sed__width')
+plt.title('sed width before calculating')
+
+
+#%%
+
+#calculate initial sediment width
+calc_ws(mg, thetarad)
+
+plt.figure()
+imshow_grid(mg, 'channel_sed__width')
+plt.title('sed width after calculating')
+
+
+#%%
+
+
+#function to guess discharge based on flow depth h, manning, width of sediment in channel, previous discharge 
+#model uses root finding function to find value of h that gives this function the smallest Q_error
 def Qwg(h, manning_n, ws, thetarad, S, Qw):
     
     Qwg = (1 / manning_n) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * (
@@ -207,27 +348,39 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw):
 
 
 
+#%%
 
-def calc_ws(mg, thetarad):
-    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+#TODO - TRY USING BRENT INSTEAD OF NEWTON SOLVER
+#SEE https://waterprogramming.wordpress.com/2016/08/18/root-finding-in-matlab-r-python-and-c/'
+#SEE ALSO https://www.engr.scu.edu/~emaurer/hydr-watres-book/flow-in-open-channels.html
 
-
-#calculate initial sediment width
-calc_ws(mg, thetarad)
 
 #%%
 
-#print(mg.at_node['channel_sed__width'])
+#Save model initial condition to xarray output
+for of in out_fields:
+    ds[of][0, :, :] = mg['node'][of].reshape(mg.shape)
+
 
 #%%
 
 #Main model loop
 
+elapsed_time = 0
+
 for i in range(nts):
+    
     
     #flow routing
     fr.run_one_step()
     
+    
+    if elapsed_time %save_interval== 0:
+        
+        ds_ind = int((elapsed_time/save_interval))
+    
+        for of in out_fields:
+            ds[of][ds_ind, :, :] = mg['node'][of].reshape(mg.shape)
     
     #iterate through nodes, upstream to downstream to calculate flow depth
     #not actually sure if order is important here
@@ -241,7 +394,7 @@ for i in range(nts):
         if mg.status_at_node[j] == 0: #don't operate on boundary nodes
             mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True)
     
-    print(h)
+    print('h=', h)
     
     #TODO after optimizing for h, need to calculate hydraulic radius and velocity?
     #Joel's code does this, but rh and U don't actually get used elsewhere in model - just for looking at output?
@@ -294,6 +447,8 @@ for i in range(nts):
     
     #Update channel sediment width, ws
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+    
+    elapsed_time += space_dt
     
 
     
