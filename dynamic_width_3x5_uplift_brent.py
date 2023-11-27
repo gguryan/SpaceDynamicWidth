@@ -43,12 +43,12 @@ inputs = load_params('dynamic_w_inputs_3x5.txt')
 
 #%%
 
-ds_file_out = 'SDW_3x5_500kyr.nc'
+ds_file_out = 'SDW_3x5_Brent800kyr.nc'
 
 #%%
 
 #Model time in years
-space_runtime = 200000 #todo change var names to model_runtime
+space_runtime = 800000 #todo change var names to model_runtime
 
 #grid dimensions
 dx = inputs['dx']
@@ -84,6 +84,7 @@ v_s = inputs["V_mperyr"]
 phi = inputs["porosity"]
 Ff = inputs["Ff"]
 
+space_uplift = inputs['space_uplift']
 
 V_mperyr = v_s
 
@@ -163,10 +164,10 @@ h = np.ones((nx, ny)) * h_initguess
 mg.add_field('flow__depth', h, at = 'node') 
 
 
-#set initial elevations for middle two cells 
-z[5] = 100.0
-z[6] = 95.0
-z[7] = 90.0
+#set initial elevations for middle two cells and outlet
+z[5] = 50.0
+z[6] = 49.0
+z[7] = 48.0
 
 mg.set_watershed_boundary_condition_outlet_id(7, 
                                               mg.at_node['topographic__elevation'],
@@ -351,12 +352,13 @@ plt.title('sed width after calculating')
 
 #function to guess discharge based on flow depth h, manning, width of sediment in channel, previous discharge 
 #model uses root finding function to find value of h that gives this function the smallest Q_error
-def Qwg(h, manning_n, ws, thetarad, S, Qw):
+def Qwg(h, manning_n, ws, thetarad, S, Qw_target):
     
     Qwg = (1 / manning_n) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * (
                 (ws + 2 * h / math.sin(thetarad)) ** (-2 / 3)) * S ** 0.5
 
-    Q_error = np.abs(Qw - Qwg)
+    #Q_error = np.abs(Qw_target - Qwg) #For Newton Solver
+    Q_error = (Qwg - Qw_target) #For Brent solver #TODO does this even make sense??
     
     return Q_error
 
@@ -388,20 +390,16 @@ for of in out_fields:
 
 elapsed_time = 0
 
+#Upper and lower bounds 
+lower_bound = 0.000000001
+upper_bound = 99
+
 for i in range(nts):
     
     
     #flow routing
     fr.run_one_step()
-    
-    
-    if elapsed_time %save_interval== 0:
         
-        ds_ind = int((elapsed_time/save_interval))
-    
-        for of in out_fields:
-            ds[of][ds_ind, :, :] = mg['node'][of].reshape(mg.shape)
-    
     #iterate through nodes, upstream to downstream to calculate flow depth
     #not actually sure if order is important here
     nodes_ordered = mg.at_node["flow__upstream_node_order"]
@@ -414,17 +412,12 @@ for i in range(nts):
         #if j == 5 or j == 6:
             #print(j, 'ws=', func_args[1], 'S=', func_args[3], 'Qw=', func_args[4] )
         
-        if mg.status_at_node[j] == 0: #don't operate on boundary nodes
-            mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True, maxiter=100)
-    
-            #mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True)
-
-    #print('ws=', func_args[1], 'S=', func_args[3], 'Qw=', func_args[4] )
-    
-    #TODO after optimizing for h, need to calculate hydraulic radius and velocity?
-    #Joel's code does this, but rh and U don't actually get used elsewhere in model - just for looking at output?
-
-    
+        if mg.status_at_node[j] == 0: #operate on core nodes only
+        
+            mg.at_node['flow__depth'][j] = scipy.optimize.brentq(Qwg, a=lower_bound, b=upper_bound, args=func_args, disp=True, maxiter=100)
+            #print('ws=', func_args[1], 'S=', func_args[3], 'Qw=', func_args[4], 'j=', j)
+            
+        
     #calculate width at water surface
     mg.at_node['water_surface__width'][:] = mg.at_node['channel_sed__width'][:] + 2 * mg.at_node['flow__depth'][:] / np.tan(thetarad)
     
@@ -473,6 +466,23 @@ for i in range(nts):
     #Update channel sediment width, ws
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
+    
+    if np.isnan(ws[5]):
+        print('ws is nan at node 5, i=',i)
+        
+    if np.isnan(ws[6]):
+        print('ws is nan at node 6, i=', i)
+    
+    
+    #copy array of flow depths to use as initial input for next timestep 
+    h_old = mg.at_node['flow__depth'].copy()
+    
+    
+    dz_ad = np.zeros(mg.size('node'))
+    dz_ad[mg.core_nodes] = space_uplift * space_dt
+    mg.at_node['topographic__elevation'] += dz_ad
+    
+    
 
     if elapsed_time %save_interval== 0:
         
@@ -482,7 +492,8 @@ for i in range(nts):
             ds[of][ds_ind, :, :] = mg['node'][of].reshape(mg.shape)
         
         print(elapsed_time, ds_ind)
-        #ds.to_netcdf(ds_file_out)
+        ds.to_netcdf(ds_file_out)
+        
 
     elapsed_time += space_dt
 
@@ -510,3 +521,7 @@ imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation 
 # =============================================================================
 
 sed_flux_in = mg.at_node['sediment__influx']
+
+#%%
+
+test_depth = ds.isel()

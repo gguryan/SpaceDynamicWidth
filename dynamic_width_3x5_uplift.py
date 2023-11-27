@@ -84,6 +84,7 @@ v_s = inputs["V_mperyr"]
 phi = inputs["porosity"]
 Ff = inputs["Ff"]
 
+space_uplift = inputs['space_uplift']
 
 V_mperyr = v_s
 
@@ -163,10 +164,10 @@ h = np.ones((nx, ny)) * h_initguess
 mg.add_field('flow__depth', h, at = 'node') 
 
 
-#set initial elevations for middle two cells 
-z[5] = 100.0
-z[6] = 95.0
-z[7] = 90.0
+#set initial elevations for middle two cells and outlet
+z[5] = 50.0
+z[6] = 49.0
+z[7] = 48.0
 
 mg.set_watershed_boundary_condition_outlet_id(7, 
                                               mg.at_node['topographic__elevation'],
@@ -415,9 +416,17 @@ for i in range(nts):
             #print(j, 'ws=', func_args[1], 'S=', func_args[3], 'Qw=', func_args[4] )
         
         if mg.status_at_node[j] == 0: #don't operate on boundary nodes
+        
             mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True, maxiter=100)
+        
+            #if elapsed_time == 0:
+                #g.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True, maxiter=100)
+                
+            #else:
+                #h_newguess =  h_old[j]
+                #mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_newguess, args=func_args, disp=True, maxiter=100)
     
-            #mg.at_node['flow__depth'][j] = scipy.optimize.newton(Qwg, x0=h_initguess, args=func_args, disp=True)
+          
 
     #print('ws=', func_args[1], 'S=', func_args[3], 'Qw=', func_args[4] )
     
@@ -473,6 +482,16 @@ for i in range(nts):
     #Update channel sediment width, ws
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
+    
+    #copy array of flow depths to use as initial input for next timestep 
+    h_old = mg.at_node['flow__depth'].copy()
+    
+    
+    dz_ad = np.zeros(mg.size('node'))
+    dz_ad[mg.core_nodes] = space_uplift * space_dt
+    mg.at_node['topographic__elevation'] += dz_ad
+    
+    
 
     if elapsed_time %save_interval== 0:
         
@@ -483,6 +502,7 @@ for i in range(nts):
         
         print(elapsed_time, ds_ind)
         #ds.to_netcdf(ds_file_out)
+        
 
     elapsed_time += space_dt
 
@@ -510,3 +530,7 @@ imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation 
 # =============================================================================
 
 sed_flux_in = mg.at_node['sediment__influx']
+
+#%%
+
+test_depth = ds.isel()
