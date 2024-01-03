@@ -9,7 +9,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-
+import pandas as pd
 
 #%%INPUTS
 #Inputs for single cross section of Lague/SPACE dynamic width
@@ -27,6 +27,7 @@ Qw = 100  # Water discharge, in m3/s
 Qs = 0.1  # Sediment load, in m3/s (volume supply rate)
 # S_init = 0.02  # Reach slope, m/m
 S_init = 0.01527  # Reach slope, m/m
+
 
 thetadeg = 60  # Sidewall (bank) angle, measured from horizontal. Lague(2010) used 60.
 # wr_init = 10  # Bedrock bed width, initial, in m.
@@ -130,10 +131,14 @@ for itnum in range(maxitnum):  # iterate
     # Loop to iterate for depth and velocity from Manning's equation
     while Qwerrorfraction > error_tolfraction:
         # calculate estimate of discharge
-        Qwg = (1 / manningsn) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * (
-                    (ws + 2 * h / math.sin(thetarad)) ** (-2 / 3)) * S ** 0.5  # Qwg for Qw guess, ie calculation
+       
+     
+        Qwg = (1 / manningsn) * ((h * (ws + h / math.tan(thetarad))) ** (5 / 3)) * ((ws + 2 * h / math.sin(thetarad)) ** (-2 / 3)) * S ** 0.5
+
+        
         Qwerrorfraction = np.abs((Qw - Qwg) / Qw)
         manning_itnum += 1
+        
         if Qwerrorfraction <= error_tolfraction:
             rh = h * (ws + h / np.tan(thetarad)) / (ws + 2 * h / math.sin(thetarad))  # hydraulic radius
             U = (1 / manningsn) * (rh ** (2 / 3)) * S ** 0.5  # Calculate velocity, done!
@@ -162,6 +167,7 @@ for itnum in range(maxitnum):  # iterate
     # factor or coefficient (kind of subsumed into Kr, Ks) for calculating Er and Es
     psibank = rhow * g * Fw / 2 * (wws / h * np.sin(thetarad) - np.cos(thetarad))
     psibed = rhow * g * (1 - Fw) / 2 * (1 + wws * np.tan(thetarad) / (wws * np.tan(thetarad) - 2 * h))
+
 
     # Calculate Er and Es
     Er = (Kr * psibed * q * S ** n - omegacr) * np.exp(-H / Hstar)  # bedrock BED erosion rate beneath cover. in m/s in this
@@ -221,7 +227,7 @@ print('Model run time =', model_time, 'minutes')
 
 yrs = np.arange(itnum + 2 ) * timestep_yrs
 
-plt.figure()
+plt.figure(figsize=(25, 10))
 plt.subplot(2, 2, 1)
 plt.plot(yrs, Hall, 'b-')
 plt.plot(yrs, hall, 'r-')
@@ -255,3 +261,134 @@ plt.xlabel('years')
 
 #print('Can make plots etc from within the running program. type "dbquit" to end')
 #input("Press Enter to continue...")
+
+#%%
+
+column_names = ['Years', 'Wr', 'Ws', 'Er', 'Es', 'Ds', 'Ebank', 'Slope', 'H', 'h', 'U' ]
+
+df = pd.DataFrame(columns=column_names)
+
+#%%
+
+df['Years'] = yrs
+df['Wr'] = wrall
+df['Ws'] = wsall
+df['Er'] = Erall
+df['Es'] = Esall
+df['Ds'] = Dsall
+df['Ebank'] = Ebankall
+df['Slope'] = Sall
+df['H'] = Hall
+df['h'] = hall
+df['U'] = Uall
+
+#%%
+
+df.to_csv('1D_sims_for_talk.csv')
+
+
+#%%
+
+plt.figure(dpi=300, figsize=(8, 3))
+
+plt.vlines(x = 200000, ymin = 0, ymax=6,
+           colors = 'dimgrey', linestyles='--')
+
+plt.vlines(x = 1e6, ymin = 0, ymax=6,
+           colors = 'dimgrey', linestyles='--')
+
+plt.plot(df['Years'], df['H'], 'b-', label='H, sed. thickness')
+plt.plot(df['Years'], df['h'], 'r-', label='h, water depth')
+plt.plot(df['Years'], df['U'], 'g-', label='U, flow vel. ')
+
+plt.legend(loc='upper right')
+plt.xlabel('million years')
+plt.ylabel('m, m, m/s')
+
+plt.xlim(left=0, right=2e6)
+plt.ylim(bottom=0, top=6)
+
+
+plt.title('')
+
+plt.rcParams['font.size'] = 12
+
+#%%
+
+plt.figure(dpi=300, figsize=(8, 3))
+
+
+plt.vlines(x = 200000, ymin = 0, ymax=35,
+           colors = 'dimgrey', linestyles='--')
+
+plt.vlines(x = 1e6, ymin = 0, ymax=35,
+           colors = 'dimgrey', linestyles='--')
+
+plt.plot(df['Years'], df['Wr'], 'k-', label='Bedrock Width')
+plt.plot(df['Years'], df['Ws'], 'r-', label='Sediment Width')
+
+plt.legend(loc='lower right')
+plt.ylabel('width, m')
+plt.xlabel('million years')
+
+plt.xlim(left=0, right=2e6)
+plt.ylim(bottom=0, top=31)
+
+
+plt.title('')
+
+plt.rcParams['font.size'] = 12
+
+#%%
+
+plt.figure(dpi=300, figsize=(8, 3))
+
+
+plt.vlines(x = 200000, ymin = 0, ymax=1e-9,
+           colors = 'dimgrey', linestyles='--')
+
+plt.vlines(x = 1e6, ymin = 0, ymax=1e-9,
+          colors = 'dimgrey', linestyles='--')
+
+plt.plot(df['Years'], df['Er'], 'k-', label='Bedrock Erosion')
+plt.plot(df['Years'], df['Es'], 'r-', label='Sediment Erosion')
+plt.plot(df['Years'], df['Ebank'], 'b-', label='Bank Erosion')
+plt.plot(df['Years'], df['Ds'], color='orange', ls='--', label='Sediment Deposition')
+
+plt.legend(loc='upper right')
+plt.ylabel('m/s')
+plt.xlabel('million years')
+
+plt.xlim(left=0, right=2e6)
+plt.ylim(bottom=0, top=1e-9)
+
+
+plt.title('')
+
+plt.rcParams['font.size'] = 12
+
+#%%
+
+plt.figure(dpi=300, figsize=(8, 3))
+
+
+plt.vlines(x = 200000, ymin = 0, ymax=.02,
+           colors = 'dimgrey', linestyles='--')
+
+plt.vlines(x = 1e6, ymin = 0, ymax=.02,
+          colors = 'dimgrey', linestyles='--')
+
+plt.plot(df['Years'], df['Slope'], 'b-', label='Slope')
+
+
+plt.legend(loc='upper right')
+plt.ylabel('Slope')
+plt.xlabel('million years')
+
+plt.xlim(left=0, right=2e6)
+plt.ylim(bottom=0, top=.02)
+
+
+plt.title('')
+
+plt.rcParams['font.size'] = 12
