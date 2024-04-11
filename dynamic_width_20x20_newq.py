@@ -22,7 +22,6 @@ from lague_stress_funcs import Stress_Funcs
 
 from landlab import load_params
 
-
 from landlab import RasterModelGrid
 
 from landlab.plot import imshow_grid
@@ -45,12 +44,12 @@ inputs = load_params('dynamic_w_inputs_20x20_brent4.txt')
 
 #%%
 
-ds_file_out = 'SDW_20x20_600kyr_b4_newq.nc'
+ds_file_out = 'SDW_20x20_2000kyr_b4_fsc300.nc'
 
 #%%
 
 #Model time in years
-space_runtime = 600000 #todo change var names to model_runtime
+space_runtime = 2000000 #todo change var names to model_runtime
 
 
 #grid dimensions
@@ -201,7 +200,7 @@ fsc = FastscapeEroder(mg, K_sp=1e-4)
 fsc_dt = 100
 fsc_time = 0
 
-fsc_nts = 800
+fsc_nts = 300
 
 for i in range (fsc_nts):
     
@@ -267,7 +266,7 @@ space = SpaceLargeScaleEroder(mg,
 t = np.arange(0, space_runtime+space_dt, space_dt)
 nts = len(t)
 
-save_interval = 1000
+save_interval = 100
 
 out_times = np.arange(0, space_runtime+save_interval, save_interval)
 out_count = len(out_times)
@@ -593,3 +592,13 @@ sed_flux_in = mg.at_node['sediment__influx']
 #%%
 
 test_depth = ds.isel()
+
+#%%
+
+
+topo_1000 = ds.topographic__elevation.sel(x=1000, y=1000)
+
+#%%
+
+plt.figure()
+topo_1000.plot()

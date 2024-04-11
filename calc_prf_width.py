@@ -43,6 +43,13 @@ def calc_prf_width(ds, plot_time, sf_min_DA):
     mg.has_field('node', 'channel_sed__width')
     sed_width is mg.add_field('node', 'channel_sed__width', sed_width, dtype=int)
     
+    br_width = ds.channel_bedrock__width.sel(time=plot_time)
+    mg.has_field('node', 'channel_bedrock__width')
+    br_width is mg.add_field('node', 'channel_bedrock__width', sed_width, dtype=int)
+    
+    flow__depth = ds.flow__depth.sel(time=plot_time)
+    mg.has_field('node', 'flow__depth')
+    flow__depth is mg.add_field('node', 'flow__depth', sed_width, dtype=int)
     
     #Add bedrock erosion term
     Er = ds.bedrock_erosion__rate.sel(time=plot_time)
@@ -58,9 +65,9 @@ def calc_prf_width(ds, plot_time, sf_min_DA):
     
     
     #Add soil depth to model grid
-    #sed_depth = ds.soil__depth.sel(time=plot_time)
-    #mg.has_field('node', 'soil__depth')
-    #sed_depth is mg.add_field('node', 'soil__depth', sed_depth, dtype=float)
+    sed_depth = ds.soil__depth.sel(time=plot_time)
+    mg.has_field('node', 'soil__depth')
+    sed_depth is mg.add_field('node', 'soil__depth', sed_depth, dtype=float)
     
     
     #Add sediment erosion term
@@ -86,11 +93,17 @@ def calc_prf_width(ds, plot_time, sf_min_DA):
 
     channel_dist = prf.data_structure[0][prf_keys[0]]['distances']
     channel_dist_ids = prf.data_structure[0][prf_keys[0]]['ids']
+    
     channel_elev = mg.at_node["topographic__elevation"][channel_dist_ids]
     channel_ksn = mg.at_node["channel__steepness_index"][channel_dist_ids]
     drainage_area = mg.at_node["drainage_area"][channel_dist_ids]
     channel_slope = mg.at_node['topographic__steepest_slope'][channel_dist_ids]
-    
+    br_width = mg.at_node['channel_bedrock__width'][channel_dist_ids]
+    flow__depth = mg.at_node['flow__depth'][channel_dist_ids]
+    sed_depth = mg.at_node['soil__depth'][channel_dist_ids]
+    bed_er = mg.at_node['bedrock_erosion__rate'][channel_dist_ids]
+    bank_er = mg.at_node['bank_erosion__rate'][channel_dist_ids]
+ 
 
 
 
@@ -98,7 +111,12 @@ def calc_prf_width(ds, plot_time, sf_min_DA):
                    'channel_elev': channel_elev,
                    'channel_ksn' : channel_ksn,
                    'channel_slope' : channel_slope,
-                   'drainage_area' : drainage_area})
+                   'drainage_area' : drainage_area, 
+                   'br_width' : br_width,
+                   'flow_depth' : flow__depth,
+                   'sed_depth' : sed_depth,
+                   'bed_er' : bed_er,
+                   'bank_er' : bank_er})
     
     df["uplift"] = .001
     

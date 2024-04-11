@@ -39,11 +39,11 @@ from landlab.components import (FlowAccumulator,
 
 #%%inputs and outputs
 
-inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+inputs = load_params('dynamic_w_inputs_10x10_UnitCheck.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
-ds_file_out = 'ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
+ds_file_out = 'ModelOutput/SDW_10x10_UnitCheck_300kyr_dx100.nc'
 
 #%%
 
@@ -51,7 +51,7 @@ ds_file_out = 'ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
 sec_per_yr =  60 * 60 * 24 * 365
 
 #Model time in years
-space_runtime = 1600000
+space_runtime = 300000
 space_runtime_sec = space_runtime * sec_per_yr
 
 
@@ -62,7 +62,8 @@ nx=inputs['nx']
 ny=inputs['ny']
 
 
-space_dt = inputs['dt'] #years
+#space_dt = inputs['dt'] #years
+space_dt = 10
 space_dt_sec = space_dt * sec_per_yr
 
 theta_deg = inputs['theta_deg']
@@ -74,7 +75,8 @@ rho_sed = inputs["rho_sed"] # Density of sediment, kg/m^3
 
 H_init = inputs["H_init"] #Initial sediment depth on bed, in m
 
-wr_init = inputs["wr_init"] # Bedrock bed width, initial, in m.
+#wr_init = inputs["wr_init"] # Bedrock bed width, initial, in m.
+wr_init = 10
 wr_min = inputs['wr_min']  # Minimum bedrock bed width, code just stops if it gets this small.
 
 U_initguess = inputs['U_initguess']  # Initial guess of avg velocity, in m/s, just to start the iteration process.
@@ -98,7 +100,7 @@ Ff = inputs["Ff"]
 Upliftrate_mperyr = inputs['space_uplift']
 space_uplift_sec = Upliftrate_mperyr / sec_per_yr
 
-v_seconds = V_mperyr / sec_per_yr
+v_seconds = V_mperyr * sec_per_yr
 
 
 
@@ -106,9 +108,6 @@ v_seconds = V_mperyr / sec_per_yr
 rhow = 1000  # Water density, kg/m^3
 rhos = 2500  # Sediment density, kg/m^3
 g = 9.81  # Gravitational acceleration, m/s^2
-
-
-
 
 
 
@@ -124,7 +123,7 @@ mg = RasterModelGrid((nx, ny), dx)
 H_soil = mg.add_zeros('node', 'soil__depth') #Create a grid field for soil depth
 mg.at_node['soil__depth'][:] = H_init
 
-wr = np.zeros((nx, ny)) 
+wr = np.ones((nx, ny)) * wr_init
 wr = mg.add_field("channel_bedrock__width", wr, at="node")
 
 #ws = np.zeros((nx, ny)) 
@@ -208,7 +207,7 @@ fsc = FastscapeEroder(mg, K_sp=1e-4)
 fsc_dt = 100
 fsc_time = 0
 
-fsc_nts = 1000
+fsc_nts = 500
 
 for i in range (fsc_nts):
     
@@ -290,12 +289,12 @@ space = SpaceLargeScaleEroder(mg,
 #            sp_crit_sed = sp_crit_sed,
 #            sp_crit_br = sp_crit_br,
 #            discharge_field='surface_water__discharge')
+# 
 # =============================================================================
-
 
 #%%
 
-t = np.arange(0, space_runtime_sec+space_dt_sec, space_dt_sec)            
+t = np.arange(0, space_runtime_sec+space_dt_sec, space_dt_sec)
 nts = len(t)
 
 t_yrs = t/sec_per_yr
@@ -355,20 +354,11 @@ ds = xr.Dataset(
                 
             }),   
         
-        'soil__depth' : (
-            ('time', 'y', 'x'),  # tuple of dimensions
-            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
-            {
-                'units': 'meters',
-                'long_name': 'sediment thickness',
-                
-            }),   
-        
         'surface_water__discharge' : (
             ('time', 'y', 'x'),  # tuple of dimensions
             np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
             {
-                'units': 'm**2/s',
+                'units': 'm**2/yr',
                 'long_name': 'Discharge',
                 
             }), 
@@ -418,8 +408,7 @@ out_fields = ['topographic__elevation',
               'flow__depth',
               'surface_water__discharge',
               'topographic__steepest_slope',
-              'channel_bedrock__width', 
-              'soil__depth']
+              'channel_bedrock__width']
              
 
 #%%Define functions
@@ -442,33 +431,20 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw_target):
 def calc_ws(mg, thetarad):
     mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] 
     + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
-    
-    
-def change_dir(E_bed, E_bank, thetarad):
-    ratio = E_bank / np.cos(thetarad)
-    statuses = np.where(E_bed > ratio, 'narrowing', np.where(E_bed < ratio, 'widening', 'static'))
-    return statuses
 
 #%%Calculate initial channel geometry
 
-#start w width scaled to drainage area
-#TODO for development purposes ONLY
-#Convert drainage area to KM sqared for this
-
-wr[:] = (mg.at_node['drainage_area'] / 1000 )**0.5
-
-#%%
 
 #calculate initial sediment width
 calc_ws(mg, thetarad)
 
          
 #calculate width at water surface
-wws[:] = mg.at_node['channel_sed__width'][:] + 2 * h_initguess / np.tan(thetarad)
+wws = mg.at_node['channel_sed__width'][:] + 2 * h_initguess / np.tan(thetarad)
     
     
 #Calculate depth-averaged width
-w_avg[:] = (wws + mg.at_node['channel_sed__width'][:]) / 2
+w_avg = (wws + mg.at_node['channel_sed__width'][:]) / 2
 
 
 
@@ -486,8 +462,6 @@ z11_init = z[11]
 
 #%% Main model loop
 
-runoff_manual = 10000 #manual multiplier on discharge
-
 elapsed_time = 0
 elapsed_time_yrs= 0
 total_U = 0
@@ -499,15 +473,15 @@ upper_bound = dx-1 #should probably be lower, doesn't matter in current paramete
 
 
 
-#for i in range(10000):
+#for i in range(5):
 for i in range(nts):
     
     #flow routing    
     fa.run_one_step()
     
     
-    #convert discharge from m3/yr to m3/sec, manually add in "runoff rate" / multiplier to get reasonable discharge in m3/sec
-    Q_sec[:] = Qw[:] / sec_per_yr * runoff_manual
+    #convert discharge from m3/yr to m3/sec
+    Q_sec[:] = Qw[:] / sec_per_yr
     
     #calculate normalized discharge in m2/sec by dividing by avg channel width
     mg.at_node['normalized__discharge_sec'][:] = (Q_sec[:] / w_avg[:])
@@ -565,7 +539,6 @@ for i in range(nts):
     
     #Update discharge field to m2/s before calculation erosion with space
     mg.at_node['surface_water__discharge'][:] = mg.at_node['normalized__discharge_sec'][:] 
-    
     #erode with space
     space.run_one_step(dt=space_dt_sec)
     
@@ -603,7 +576,16 @@ for i in range(nts):
     dz_ad[mg.core_nodes] = space_uplift_sec * space_dt_sec
     mg.at_node['bedrock__elevation'] += dz_ad
     
-  
+
+    
+    #TODO figure out what's going on with node 11 - why is elevation increasing??
+    
+    #Calculate max possible elevation at node 11 w/ no erosion
+    max_z_11 = total_U + mg.at_node['soil__depth'][11] + z11_init
+    
+    if z[11] > max_z_11:
+        print(i, 'elev at node 11 is too high')
+    
     
     #save output, check how long code has been running
     if elapsed_time_yrs %save_interval== 0:
@@ -615,21 +597,21 @@ for i in range(nts):
     
         for of in out_fields:
             ds[of][ds_ind, :, :] = mg['node'][of].reshape(mg.shape)
-            
-        print(elapsed_time_yrs, time_diff_minutes )
-        print ("wr=","{0:0.2f}".format(round(wr[21], 2)), "h=", "{0:0.2f}".format(round(h[21], 2)), "wwa=", "{0:0.2f}".format(round(w_avg[21], 2)))
+        
+        print(elapsed_time_yrs, ds_ind, time_diff_minutes)
         
         #write output to netcdf file
         ds.to_netcdf(ds_file_out)
         
     
+    #update total uplift
+    total_U += space_uplift_sec * space_dt_sec
+    
     #update elapsed time
     elapsed_time += space_dt_sec
     elapsed_time_yrs += space_dt_sec / sec_per_yr
+
     
-    if elapsed_time_yrs == 600000:
-        #space_uplift_sec *= 2
-        runoff_manual *= 2
 
     
 #%%
@@ -651,6 +633,3 @@ plt.figure()
 imshow_grid(mg, 'soil__depth', colorbar_label='Sed Thickness (m)')   
 plt.title('Final Sediment Thickness') 
 
-#%%
-
-width_status = change_dir(bed_er, bank_er, thetarad)

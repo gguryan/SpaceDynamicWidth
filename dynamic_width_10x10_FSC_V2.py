@@ -44,7 +44,7 @@ inputs = load_params('dynamic_w_inputs_10x10_V5a.txt')
 #%%
 
 save_output = False #Do you want to save the model output to netcdf file?
-ds_file_out = '10x10_500kyr_V5_fsc200_newq.nc'
+ds_file_out = '10x10_500kyr_V5_fsc200_newq_2024.nc'
 
 
 #%%
@@ -305,7 +305,7 @@ space = SpaceLargeScaleEroder(mg,
 t = np.arange(0, space_runtime+space_dt, space_dt)
 nts = len(t)
 
-save_interval = 1000
+save_interval = 20
 
 out_times = np.arange(0, space_runtime+save_interval, save_interval)
 out_count = len(out_times)
@@ -558,6 +558,7 @@ for i in range(1):
 
             else:
                h[j] = scipy.optimize.brentq(Qwg, a=lower_bound, b=upper_bound, args=func_args, disp=True, maxiter=100)
+               print(h)
               
     #calculate hydraulic radius using function defined above
     calc_rh(mg)

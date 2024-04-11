@@ -26,9 +26,9 @@ from landlab.components import (FlowAccumulator,
 #%%
 
 #ds = xr.open_dataset('10x10_1500kyr_V4.nc')
-ds = xr.open_dataset('10x10_1myr_V5_fsc500.nc')
+ds = xr.open_dataset('ModelOutput/10x10_500kyr_V5_fsc200_newq.nc')
 
-plot_time = 1e6
+plot_time = 10000
 
 #load the input parameters that are saved as metadata on the ds
 ds_attrs = ds.attrs

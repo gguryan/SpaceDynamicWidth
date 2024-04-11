@@ -33,7 +33,9 @@ from landlab.components import (FlowAccumulator,
 #ds = xr.open_dataset('SDW_20x20_B4_fsc.nc')
 #ds=xr.open_dataset('SDW_20x20_600kyr_b4_dt10.nc')
 #ds = xr.open_dataset('SDW_20x20_2000kyr_b4_fsc300.nc')
-ds = xr.open_dataset('ModelOutput/SDW_10x10_UnitCheck_sec_dx50.nc')
+#ds = xr.open_dataset('ModelOutput/SDW_10x10_800kyr_dx100_e-10_sed5.nc')
+#ds = xr.open_dataset(''ModelOutput/SDW_20x20_e-14_2_highU_NoSed.nc'')
+ds = xr.open_dataset('ModelOutput/SDW_20x20_e-14_2_highU_4.nc')
 
 
 #load the input parameters that are saved as metadata on the ds
@@ -43,7 +45,7 @@ ds_attrs = ds.attrs
 
 sec_per_yr =  60 * 60 * 24 * 365
 
-plot_time = 10000
+plot_time = 500000
 
 dx = ds_attrs['dx']
 
@@ -67,6 +69,11 @@ mean_topo.plot()
 
 #%%
 
+
+ds.channel_bedrock__width.loc[dict(time=plot_time, x=0,y=0)] = np.nan
+
+#%%
+
 br_width = ds.channel_bedrock__width
 
 mean_br_width = br_width.mean(dim=["x", "y"])
@@ -75,11 +82,13 @@ plt.figure()
 mean_br_width.plot()
 plt.title('Mean Channel Width')
 
+
+
 #%%
 
-ds_coords = [50, 50] 
-us_coords = [250, 350]
-mid_coords = [150, 200]
+ds_coords = [100, 100] 
+us_coords = [1600, 1600]
+mid_coords = [900, 900]
 
 
 #ds_coords = [100, 100] 
@@ -124,7 +133,7 @@ plt.rcParams['font.size'] = 12
 
 width1d = ds.channel_bedrock__width.sel(x=us_coords[0], y=us_coords[1])
 
-width1d_100 = ds.channel_bedrock__width.sel(x=dx, y=dx)
+width1d_100 = ds.channel_bedrock__width.sel(x=ds_coords[0], y=ds_coords[1])
 
 width1d_25 = ds.channel_bedrock__width.sel(x=mid_coords[0], y=mid_coords[1])
 
@@ -137,7 +146,7 @@ xfmt.set_powerlimits((0,3))
 
 width1d.plot(color='indigo', label='upstream')
 width1d_25.plot(color='teal', label='mid-channel')
-#width1d_100.plot(color='goldenrod', label='outlet')
+width1d_100.plot(color='goldenrod', label='outlet')
 plt.legend(loc='best')
 
 
@@ -158,7 +167,7 @@ plt.rcParams['font.size'] = 12
 topo_800 = ds.topographic__elevation.sel(time=plot_time)
 br_w_800 = ds.channel_bedrock__width.sel(time=plot_time)
 sed_w_800 = ds.channel_sed__width.sel(time=plot_time)
-Qw_800 = ds.surface_water__discharge.sel(time=plot_time)
+Qw_800  = ds.surface_water__discharge.sel(time=plot_time) 
 flow_depth =  ds.flow__depth.sel(time=plot_time)
 
 Q_47 = Qw_800 ** 0.5
@@ -332,7 +341,7 @@ plt.title('Topo Final - Topo Init')
 #%%
 
 
-plot_time_2 = plot_time - 10000
+plot_time_2 = plot_time - 1000
 mg2, df2 = calc_prf_width(ds, plot_time_2, sf_min_DA)
 
 #%%
@@ -340,5 +349,45 @@ mg2, df2 = calc_prf_width(ds, plot_time_2, sf_min_DA)
 prf_diff = df['channel_elev'] - df2['channel_elev'] 
 
 plt.figure()
-plt.title('Diff Between topo final and 100 kyr earlier')
+plt.title('Diff Between topo final and 1 kyr earlier')
 plt.plot(df['channel_dist'], prf_diff)
+
+#%%
+
+flow_depth.plot()
+
+#%%  
+
+outlet_width = np.ones(801,)
+
+#%%
+
+
+# =============================================================================
+# print(br_width.sel(time=plot_time, x=100,y=100).values)
+# print(flow_depth.sel(x=100,y=100).values)
+# print(ds.soil__depth.sel(time=plot_time, x=100,y=100).values)
+# print(ds_attrs['Kr'])
+# print(ds_attrs['Kbank'])
+# print(ds_attrs['Ks'])
+# print(ds_attrs['V_mperyr'])
+# 
+# =============================================================================
+
+
+
+outlet_width = br_width.sel(time=plot_time, x=100,y=100).values
+outlet_depth = flow_depth.sel(x=100,y=100).values
+outlet_soil = ds.soil__depth.sel(time=plot_time, x=100,y=100).values
+Kr = ds_attrs['Kr']
+Kbank = ds_attrs['Kbank']
+Ks = ds_attrs['Ks']
+V = ds_attrs['V_mperyr']
+
+
+print(outlet_width, outlet_depth, outlet_soil, Kr, Kbank, Ks, V)
+
+
+#%%
+
+ds.channel_bedrock__width.sel(time=plot_time).plot()

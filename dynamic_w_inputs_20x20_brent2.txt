@@ -6,6 +6,7 @@
 dx : 100 #m
 nx: 20
 ny: 20
+dt: 20
 
 space_uplift : .001 #m/yr
 

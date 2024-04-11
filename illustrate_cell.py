@@ -15,11 +15,6 @@ import math
 
 
 
-w_br = 6 #width of channel bedrock
-H = 1.0  #sediment thickness
-h = 2.0 #flow depth
-theta_deg = 60 #bank angle in degrees
-
 def draw_channel(w_br, H, h, theta_deg):
 
     thetarad = math.radians(theta_deg)
@@ -61,8 +56,18 @@ def draw_channel(w_br, H, h, theta_deg):
     
     ax.add_patch(water_trap)
     ax.add_patch(sed_trap)
+    
+    return ax
 
 #%%
 
-draw_channel( w_br, H, h, theta_deg)
 
+w_br = 69.65 #width of channel bedrock, m
+H =   0.241638 #sediment thickness, m
+h = 5.15249 #flow depth, m
+theta_deg = 60 #bank angle in degrees
+
+ax1 = draw_channel( w_br, H, h, theta_deg)
+
+
+ax1.set_aspect('equal', adjustable='box')
