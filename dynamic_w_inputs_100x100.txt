@@ -30,11 +30,13 @@ H_init : 0  # Initial sediment depth on bed, in m.
 
 U_initguess : 2.75 #initial guess to start iterating for velocity
 
+runoff_rate : 5
 
+kQ : 5
 
-Kr : 1.5e-14  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
-Ks : 5e-15   # Sediment entrainability, units 1/m
-Kbank : 1e-14  # Try order of magnitude smaller than Kr
+Kr : 1.0e-12  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
+Ks : 3e-12   # Sediment entrainability, units 1/m
+Kbank : 1.5e-12  # Try order of magnitude smaller than Kr
 
 
 n_sp: 1                  # Exponent on slope! Not Manning's n
@@ -43,6 +45,6 @@ Hstar: 1                  # e-folding length for cover effect, in m
 omegacr: 0                # Unit stream power threshold for bedrock erosion. Note that Shobe et al. (2017) have units as m/year, I'm using m/s.
 omegacs: 0                # Unit stream power threshold for sediment entrainment
 omegacbank: 0            # Unit stream power threshold for bank erosion
-V_mperyr: 5           # Grace uses 1, 3, 5. Convert to m/s below
+V_mperyr: 3           # Grace uses 1, 3, 5. Convert to m/s below
 porosity: 0               # phi in SPACE model paper
 Ff: 0                      # Fraction fines
