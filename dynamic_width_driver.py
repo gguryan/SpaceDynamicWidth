@@ -43,7 +43,7 @@ inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
-ds_file_out = 'ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
+ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
 
 #%%
 
