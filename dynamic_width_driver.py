@@ -18,7 +18,7 @@ import scipy.optimize
 
 import xarray as xr
 
-from lague_stress_funcs import Stress_Funcs
+
 
 from landlab import load_params
 
@@ -39,11 +39,15 @@ from landlab.components import (FlowAccumulator,
 
 #%%inputs and outputs
 
-inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+#inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
-ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
+#ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
+ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_test.nc'
+
+#TODO - try model run with thresholds from original lague model
 
 #%%
 
@@ -194,7 +198,7 @@ imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Initial Topo')
-
+plt.show()
 
 
 #%%Use FastscapeEroder component to develop initial drainage network
@@ -225,7 +229,7 @@ for i in range (fsc_nts):
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Topo after FSC')
-
+plt.show()
 
 
 #%%Set up soil for SPACE
@@ -255,7 +259,7 @@ plt.figure()
 imshow_grid(mg, S, colorbar_label='Slope')
 plt.title('Initial Slope')
 
-
+plt.show()
 
 
 #%%
