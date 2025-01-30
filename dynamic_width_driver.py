@@ -39,13 +39,13 @@ from landlab.components import (FlowAccumulator,
 
 #%%inputs and outputs
 
-#inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
-inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
+inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+#inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
-ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_test.nc'
+ds_file_out = 'C:/Users/grace/Desktop/Projects/output/calc_test.nc'
 
 #TODO - try model run with thresholds from original lague model
 
@@ -240,8 +240,17 @@ mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.
 
 
 
-#%%
 
+
+DA = mg.at_node['drainage_area']
+
+#Coefficients calculated from regression line for bedrock rivers on fig 2E of Buckley et al 2024
+Q_calc = 0.25 * (DA[0]**0.6)
+
+runoff_calc = Q_calc / DA[0]
+
+
+#%%
 
 Qw = mg.at_node['surface_water__discharge'] #m3/yr
 Q_sec_init = Qw / sec_per_yr
