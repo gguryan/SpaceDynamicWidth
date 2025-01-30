@@ -18,7 +18,6 @@ import scipy.optimize
 
 import xarray as xr
 
-from lague_stress_funcs import Stress_Funcs
 
 from landlab import load_params
 
@@ -128,7 +127,7 @@ wr = np.zeros((nx, ny))
 wr = mg.add_field("channel_bedrock__width", wr, at="node")
 
 #ws = np.zeros((nx, ny)) 
-ws = mg.add_zeros("channel_sed__width", at="node")
+ws = mg.add_zeros("channel_sediment__width", at="node")
 
 psi_bed = mg.add_zeros('psi_bed', at='node')
 psi_bank = mg.add_zeros('psi_bank', at='node')
@@ -322,7 +321,7 @@ ds = xr.Dataset(
                 'long_name': 'Topographic Elevation'
             }),
             
-        'channel_sed__width':
+        'channel_sediment__width':
             (('time', 'y', 'x'), np.empty((out_count, mg.shape[0], mg.shape[1])), {
                 'units': 'm',
                 'long_name': 'Channel Sediment Width'
@@ -412,7 +411,7 @@ ds = xr.Dataset(
    
 #list of model grid fields to save to output dataset    
 out_fields = ['topographic__elevation',
-              'channel_sed__width',
+              'channel_sediment__width',
               'bank_erosion__rate',
               'bedrock_erosion__rate',
               'flow__depth',
@@ -440,7 +439,7 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw_target):
 
 #function calculate new width of sediment based on soil depth, bank angle, and bedrock width
 def calc_ws(mg, thetarad):
-    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] 
+    mg.at_node['channel_sediment__width'][:] = mg.at_node['channel_bedrock__width'][:] 
     + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
     
@@ -464,11 +463,11 @@ calc_ws(mg, thetarad)
 
          
 #calculate width at water surface
-wws[:] = mg.at_node['channel_sed__width'][:] + 2 * h_initguess / np.tan(thetarad)
+wws[:] = mg.at_node['channel_sediment__width'][:] + 2 * h_initguess / np.tan(thetarad)
     
     
 #Calculate depth-averaged width
-w_avg[:] = (wws + mg.at_node['channel_sed__width'][:]) / 2
+w_avg[:] = (wws + mg.at_node['channel_sediment__width'][:]) / 2
 
 
 
@@ -539,11 +538,11 @@ for i in range(nts):
 
         
     #calculate width at water surface
-    mg.at_node['water_surface__width'][:] = mg.at_node['channel_sed__width'][:] + 2 * mg.at_node['flow__depth'][:] / np.tan(thetarad)
+    mg.at_node['water_surface__width'][:] = mg.at_node['channel_sediment__width'][:] + 2 * mg.at_node['flow__depth'][:] / np.tan(thetarad)
     
     
     #Calculate depth-averaged width
-    mg.at_node['depth_averaged__width'][:] = (mg.at_node['water_surface__width'][:] + mg.at_node['channel_sed__width'][:]) / 2
+    mg.at_node['depth_averaged__width'][:] = (mg.at_node['water_surface__width'][:] + mg.at_node['channel_sediment__width'][:]) / 2
     
 
     #Calculate Fw, term for shear stress partitioning between bed and banks
@@ -595,7 +594,7 @@ for i in range(nts):
        raise Exception("Channel is too narrow")
     
     #Update channel sediment width, ws 
-    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+    mg.at_node['channel_sediment__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
     
     #uplift the landscape 
