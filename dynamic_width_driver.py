@@ -39,14 +39,16 @@ from landlab.components import (FlowAccumulator,
 
 #%%inputs and outputs
 
-#inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
-inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
+inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+#inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
-ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_temp.nc'
+#ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_temp.nc'
 
+
+ds_file_out = 'C:/Users/grace/Desktop/Projects/output/calc_test.nc'
 
 
 #TODO - try model run with thresholds from original lague model
@@ -152,7 +154,7 @@ wr = np.zeros((nx, ny))
 wr = mg.add_field("channel_bedrock__width", wr, at="node")
 
 #ws = np.zeros((nx, ny)) 
-ws = mg.add_zeros("channel_sed__width", at="node")
+ws = mg.add_zeros("channel_sediment__width", at="node")
 
 psi_bed = mg.add_zeros('psi_bed', at='node')
 psi_bank = mg.add_zeros('psi_bank', at='node')
@@ -266,9 +268,18 @@ mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.
 
 
 
-#convert discharge units
-Qw = mg.at_node['surface_water__discharge'] #m3/yr
-Q_sec_init = Qw / sec_per_yr
+
+
+DA = mg.at_node['drainage_area']
+
+#Coefficients calculated from regression line for bedrock rivers on fig 2E of Buckley et al 2024
+Q_calc = 0.25 * (DA[0]**0.6)
+
+runoff_calc = Q_calc / DA[0]
+
+
+#Qw = mg.at_node['surface_water__discharge'] #m3/yr
+#Q_sec_init = Qw / sec_per_yr
 
 
 
@@ -338,7 +349,7 @@ ds = xr.Dataset(
                 'long_name': 'Topographic Elevation'
             }),
             
-        'channel_sed__width':
+        'channel_sediment__width':
             (('time', 'y', 'x'), np.empty((out_count, mg.shape[0], mg.shape[1])), {
                 'units': 'm',
                 'long_name': 'Channel Sediment Width'
@@ -428,7 +439,7 @@ ds = xr.Dataset(
    
 #list of model grid fields to save to output dataset    
 out_fields = ['topographic__elevation',
-              'channel_sed__width',
+              'channel_sediment__width',
               'bank_erosion__rate',
               'bedrock_erosion__rate',
               'flow__depth',
@@ -456,7 +467,7 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw_target):
 
 #function calculate new width of sediment based on soil depth, bank angle, and bedrock width
 def calc_ws(mg, thetarad):
-    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] 
+    mg.at_node['channel_sediment__width'][:] = mg.at_node['channel_bedrock__width'][:] 
     + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
     
@@ -480,11 +491,11 @@ calc_ws(mg, thetarad)
 
          
 #calculate width at water surface
-wws[:] = mg.at_node['channel_sed__width'][:] + 2 * h_initguess / np.tan(thetarad)
+wws[:] = mg.at_node['channel_sediment__width'][:] + 2 * h_initguess / np.tan(thetarad)
     
     
 #Calculate depth-averaged width
-w_avg[:] = (wws + mg.at_node['channel_sed__width'][:]) / 2
+w_avg[:] = (wws + mg.at_node['channel_sediment__width'][:]) / 2
 
 
 
@@ -564,11 +575,11 @@ for i in range(nts):
 
         
     #calculate width at water surface
-    mg.at_node['water_surface__width'][:] = mg.at_node['channel_sed__width'][:] + 2 * mg.at_node['flow__depth'][:] / np.tan(thetarad)
+    mg.at_node['water_surface__width'][:] = mg.at_node['channel_sediment__width'][:] + 2 * mg.at_node['flow__depth'][:] / np.tan(thetarad)
     
     
     #Calculate depth-averaged width
-    mg.at_node['depth_averaged__width'][:] = (mg.at_node['water_surface__width'][:] + mg.at_node['channel_sed__width'][:]) / 2
+    mg.at_node['depth_averaged__width'][:] = (mg.at_node['water_surface__width'][:] + mg.at_node['channel_sediment__width'][:]) / 2
     
 
     #Calculate Fw, term for shear stress partitioning between bed and banks
@@ -629,7 +640,7 @@ for i in range(nts):
     check_channel_width(mg, wr_min)
     
     #Update channel sediment width, ws 
-    mg.at_node['channel_sed__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+    mg.at_node['channel_sediment__width'][:] = mg.at_node['channel_bedrock__width'][:] + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
     
     
     #uplift the landscape 

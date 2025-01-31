@@ -43,7 +43,7 @@ Hstar: 1                  # e-folding length for cover effect, in m
 omegacr: 0                # Unit stream power threshold for bedrock erosion. Note that Shobe et al. (2017) have units as m/year, I'm using m/s.
 omegacs: 0                # Unit stream power threshold for sediment entrainment
 omegacbank: 0            # Unit stream power threshold for bank erosion
-V_mperyr: 5           # Grace uses 1, 3, 5. Convert to m/s below
+V_mperyr: 0         # Grace uses 1, 3, 5. Convert to m/s below
 porosity: 0               # phi in SPACE model paper
 Ff: 0                      # Fraction fines
 
