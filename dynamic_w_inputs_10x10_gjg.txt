@@ -46,3 +46,5 @@ omegacbank: 0            # Unit stream power threshold for bank erosion
 V_mperyr: 5           # Grace uses 1, 3, 5. Convert to m/s below
 porosity: 0               # phi in SPACE model paper
 Ff: 0                      # Fraction fines
+
+
