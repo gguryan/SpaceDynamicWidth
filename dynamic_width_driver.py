@@ -44,19 +44,19 @@ inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
-#ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
-ds_file_out = 'C:/Users/grace/Desktop/Projects/output/Qcalc_test.nc'
+ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
+#ds_file_out = 'C:/Users/grace/Desktop/Projects/output/Qcalc_test.nc'
 
 #TODO - try model run with thresholds from original lague model
 
-#%%
+#%%Input variables
 
 #for converting units throughout - todo update to account for leap days, not important rn 
 sec_per_yr =  60 * 60 * 24 * 365
 
 #Model time in years
 #space_runtime = 1600000
-space_runtime = 20000 #just for testing purposes
+space_runtime = 100000 #just for testing purposes
 space_runtime_sec = space_runtime * sec_per_yr
 
 
@@ -82,7 +82,8 @@ rho_sed = inputs["rho_sed"] # Density of sediment, kg/m^3
 H_init = inputs["H_init"] #Initial sediment depth on bed, in m
 
 wr_init = inputs["wr_init"] # Bedrock bed width, initial, in m. Not currently used for anything
-wr_min = inputs['wr_min']  # Minimum bedrock bed width, code just stops if it gets this small.
+#wr_min = inputs['wr_min']  # Minimum bedrock bed width, code just stops if it gets this small.
+wr_min = .001
 
 U_initguess = inputs['U_initguess']  # Initial guess of avg velocity, in m/s, just to start the iteration process.
 
@@ -93,8 +94,8 @@ K_sed = inputs["Ks"]
 K_bank = inputs["Kbank"]
 
 #Try making things less erodible
-K_br =  K_br / 2
-K_bank = K_bank / 2
+#K_br =  K_br / 2
+#K_bank = K_bank / 2
 
 
 n_sp = inputs["n_sp"]
@@ -112,13 +113,13 @@ space_uplift_sec = Upliftrate_mperyr / sec_per_yr
 v_seconds = V_mperyr / sec_per_yr
 
 #thresholds
-sp_crit_br = inputs["omegacr"]
-sp_crit_sed = inputs["omegacs"]
+# sp_crit_br = inputs["omegacr"]
+# sp_crit_sed = inputs["omegacs"]
 omegacbank = inputs["omegacbank"]
 
-#sp_crit_br = .03 * 1.8 #tau x estimated velocity (TODO will need to recalc with new Q)
-#sp_crit_sed = sp_crit_br 
-#omegacbank = sp_crit_br * 1.2 #From phillips et al 2022
+sp_crit_br = .03 * .12  #tau x estimated velocity (.12 m3/sec for 20x20x100 grid)
+sp_crit_sed = sp_crit_br 
+omegacbank = sp_crit_br * 1.15 #From phillips et al 2022
 
 
 # Other variables, generally won't change:
@@ -252,9 +253,7 @@ mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.
 DA = mg.at_node['drainage_area']
 
 #Coefficients calculated from regression line for bedrock rivers on fig 2E of Buckley et al 2024
-Q_calc = 0.25 * (DA[nx+1]**0.6)
-
-
+#Q_calc = 0.25 * (DA[nx+1]**0.6)
 #Runoff rate = Q/drainage area, DA * runoff = Q
 #Runoff rate is in m/second
 #runoff_calc = Q_calc / DA[nx+1]
@@ -451,10 +450,25 @@ def calc_ws(mg, thetarad):
 #Start with an initial width
 #Exponent from Buckley et al 2024 fig 2A
 #their numbers are for bankfull width (not bedrock) - fine as starting point
-wr[mg.core_nodes] = .005 * (mg.at_node['drainage_area'][mg.core_nodes] ** 0.5) #channel is wider than dx if anything greater than .28 is used
+wr[mg.core_nodes] =  ((mg.at_node['drainage_area']/1e6)[mg.core_nodes] ** 0.5) #channel is wider than dx if anything greater than .28 is used
 
-if (wr > dx).any():
-    raise Exception("Bedrock width is greater than one grid cell")
+
+# if (wr > dx).any():
+#     raise Exception("Initial bedrock width is greater than one grid cell")
+    
+# if (wr < wr_min).any():
+#     raise Exception("Initial bedrock width is too narrow")
+
+
+#Check for nodes that are too narrow
+too_narrow = mg.core_nodes[wr[mg.core_nodes] < wr_min]
+if too_narrow.size > 0:
+    raise Exception(f"Initial bedrock width is too narrow at indices: {too_narrow}")
+    
+#Check for nodes that are too wide
+too_wide = mg.core_nodes[wr[mg.core_nodes] > dx]
+if too_wide.size > 0:
+    raise Exception(f"Intiial bedrock width is too wide at indices: {too_wide}")
 
 
 #calculate initial sediment width
@@ -501,7 +515,7 @@ vel_est[mg.core_nodes] = (Qw[mg.core_nodes]/Ax[mg.core_nodes])
 #vel_est = np.divide(Qw[mg.core_nodes], Ax, out=np.zeros_like(wr[mg.core_nodes], dtype=float), where=Ax != 0)
 #%%
 imshow_grid(mg, 'surface_water__discharge')
-plt.title('Initial Qw, m3/sec')
+plt.title('Initial Q, m3/sec')
 plt.show()
 
 imshow_grid(mg, 'channel_bedrock__width')
@@ -552,7 +566,7 @@ for i in range(nts):
     
 
     #calculate normalized discharge in m2/sec by dividing by avg channel width
-    mg.at_node['normalized__discharge_sec'][mg.core_nodes] = (Qw[mg.core_nodes] / w_avg[mg.core_nodes])
+    q_norm[mg.core_nodes] = (Qw[mg.core_nodes] / w_avg[mg.core_nodes])
     
         
     #iterate through nodes, upstream to downstream to calculate flow depth
@@ -577,27 +591,27 @@ for i in range(nts):
             else:
                 
                 #calculate flow depth [m]
-                mg.at_node['flow__depth'][j] = scipy.optimize.brentq(Qwg, a=lower_bound, b=upper_bound, args=func_args, disp=True, maxiter=100)
+                h[j] = scipy.optimize.brentq(Qwg, a=lower_bound, b=upper_bound, args=func_args, disp=True, maxiter=100)
 
         
     #calculate width at water surface
-    mg.at_node['water_surface__width'][mg.core_nodes] = mg.at_node['channel_sediment__width'][mg.core_nodes] + 2 * mg.at_node['flow__depth'][mg.core_nodes] / np.tan(thetarad)
+    wws[mg.core_nodes] = mg.at_node['channel_sediment__width'][mg.core_nodes] + 2 * h[mg.core_nodes] / np.tan(thetarad)
     
     
     #Calculate depth-averaged width
-    mg.at_node['depth_averaged__width'][mg.core_nodes] = (mg.at_node['water_surface__width'][mg.core_nodes] + mg.at_node['channel_sediment__width'][mg.core_nodes]) / 2
+    w_avg[mg.core_nodes] = (wws[mg.core_nodes] + mg.at_node['channel_sediment__width'][mg.core_nodes]) / 2
     
 
     #Calculate Fw, term for shear stress partitioning between bed and banks
-    mg.at_node['shear_stress__partitioning'][mg.core_nodes] = 1.78 * (mg.at_node['water_surface__width'][mg.core_nodes] / mg.at_node['flow__depth'][mg.core_nodes] * np.sin(thetarad) - 2 * np.cos(thetarad) + 1.5) ** (-1.4)
+    Fw[mg.core_nodes] = 1.78 * (wws[mg.core_nodes] / mg.at_node['flow__depth'][mg.core_nodes] * np.sin(thetarad) - 2 * np.cos(thetarad) + 1.5) ** (-1.4)
      
     
     #Next calculate width coefficient for bed
-    mg.at_node['psi_bed'][mg.core_nodes] = rhow * g * (1 - mg.at_node['shear_stress__partitioning'][mg.core_nodes]) / 2 * (1 + mg.at_node['water_surface__width'][mg.core_nodes] * np.tan(thetarad) / (mg.at_node['water_surface__width'][mg.core_nodes] * np.tan(thetarad) - 2 * mg.at_node['flow__depth'][mg.core_nodes]))
+    mg.at_node['psi_bed'][mg.core_nodes] = rhow * g * (1 - Fw[mg.core_nodes]) / 2 * (1 + mg.at_node['water_surface__width'][mg.core_nodes] * np.tan(thetarad) / wws[mg.core_nodes] * np.tan(thetarad) - 2 * h[mg.core_nodes])
     
 
     #calculate width coefficient for channel bank
-    mg.at_node['psi_bank'][mg.core_nodes] = rhow * g * mg.at_node['shear_stress__partitioning'][mg.core_nodes] / 2 * (mg.at_node['water_surface__width'][mg.core_nodes] / mg.at_node['flow__depth'][mg.core_nodes] * np.sin(thetarad) - np.cos(thetarad))
+    mg.at_node['psi_bank'][mg.core_nodes] = rhow * g * Fw[mg.core_nodes] / 2 * (wws[mg.core_nodes] / h[mg.core_nodes] * np.sin(thetarad) - np.cos(thetarad))
     
     
     #Multiply erodibilities by width coefficient
@@ -607,22 +621,22 @@ for i in range(nts):
     
     
     #Update discharge field to m2/s before calculation erosion with space 
-    mg.at_node['surface_water__discharge'][:] = mg.at_node['normalized__discharge_sec'][:] 
+    mg.at_node['surface_water__discharge'][:] = q_norm[:] 
     
     #erode with space
     space.run_one_step(dt=space_dt_sec)
     
     
     #Calculate bank erosion rate in m/sec
-    mg.at_node['bank_erosion__rate'][mg.core_nodes] = mg.at_node['K_bank'][mg.core_nodes] * mg.at_node['psi_bank'][mg.core_nodes] * mg.at_node['normalized__discharge_sec'][mg.core_nodes] * (mg.at_node['topographic__steepest_slope'][mg.core_nodes]**n_sp)- omegacbank
+    bank_er[mg.core_nodes] = mg.at_node['K_bank'][mg.core_nodes] * mg.at_node['psi_bank'][mg.core_nodes] * q_norm[mg.core_nodes] * (S[mg.core_nodes]**n_sp)- omegacbank
     
     
     #Use getter to update bedrock erosion rate from space 
-    mg.at_node['bedrock_erosion__rate'][mg.core_nodes] = space._Er[mg.core_nodes]
+    bed_er[mg.core_nodes] = space._Er[mg.core_nodes]
     
     #Calculate change in channel bedrock width at each node
     #dwrdt = (mg.at_node['bank_erosion__rate'][:] / math.sin(thetarad) - mg.at_node['bedrock_erosion__rate'][:]/math.tan(thetarad)) * 2 
-    dwrdt = 2 * ((mg.at_node['bank_erosion__rate'][mg.core_nodes] / math.sin(thetarad)) - (mg.at_node['bedrock_erosion__rate'][mg.core_nodes]/math.tan(thetarad)))
+    dwrdt = 2 * ((bank_er[mg.core_nodes] / math.sin(thetarad)) - (bed_er[mg.core_nodes]/math.tan(thetarad)))
     
     
     
@@ -636,11 +650,22 @@ for i in range(nts):
     
     #print('width after updating', wr)
     
-    if (wr[mg.core_nodes] > dx).any():
-        raise Exception("Channel width is greater than one grid cell")
+    # #Check for nodes that are too wide
+    # if (wr[mg.core_nodes] > dx).any():
+    #     raise Exception("Channel width is greater than one grid cell")
         
-    if (wr[mg.core_nodes] < wr_min).any():
-       raise Exception("Channel is too narrow")
+    # if (wr[mg.core_nodes] < wr_min).any():
+    #    raise Exception("Channel is too narrow")
+
+    #Check for nodes that are too narrow
+    too_narrow = mg.core_nodes[wr[mg.core_nodes] < wr_min]
+    if too_narrow.size > 0:
+        raise Exception(f"Channel is too narrow at indices: {too_narrow}")
+        
+    #Check for nodes that are too wide
+    too_wide = mg.core_nodes[wr[mg.core_nodes] > dx]
+    if too_wide.size > 0:
+        raise Exception(f"Channel is too wide at indices: {too_wide}")
     
     #Update channel sediment width, ws 
     mg.at_node['channel_sediment__width'][mg.core_nodes] = mg.at_node['channel_bedrock__width'][mg.core_nodes] + 2 * mg.at_node['soil__depth'][mg.core_nodes] / np.tan(thetarad)
@@ -698,3 +723,5 @@ imshow_grid(mg, 'soil__depth', colorbar_label='Sed Thickness (m)')
 plt.title('Final Sediment Thickness') 
 
 #%%
+
+wdr[mg.core_nodes] = wr[mg.core_nodes] / h[mg.core_nodes]
