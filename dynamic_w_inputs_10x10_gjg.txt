@@ -4,8 +4,8 @@
 
 #grid dimensions
 dx : 100 #m
-nx: 20
-ny: 20
+nx: 100
+ny: 100
 dt: 20
 
 space_uplift : .001 #m/yr
@@ -32,9 +32,9 @@ U_initguess : 2.75 #initial guess to start iterating for velocity
 
 
 
-Kr : 1.0e-11  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
-Ks : 1e-15   # Sediment entrainability, units 1/m
-Kbank : 1.5e-11  # Try order of magnitude smaller than Kr
+Kr : 1.0e-12  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
+Ks : 2.5e-12   # Sediment entrainability, units 1/m
+Kbank : 2.0e-12  # Try order of magnitude smaller than Kr
 
 
 n_sp: 1                  # Exponent on slope! Not Manning's n

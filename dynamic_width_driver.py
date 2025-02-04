@@ -45,7 +45,9 @@ inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 
 #path to save netcdf file to 
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
-ds_file_out = 'C:/Users/grace/Desktop/Projects/output/newQ_200kyr_lowKbank2.nc'
+ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
+
+#ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_Ke-13.nc'''
 
 #TODO - try model run with thresholds from original lague model
 
@@ -223,7 +225,7 @@ fsc = FastscapeEroder(mg, K_sp=1e-4)
 fsc_dt = 100
 fsc_time = 0
 
-fsc_nts = 1000
+fsc_nts = 2000
 
 for i in range (fsc_nts):
     
@@ -440,8 +442,8 @@ def Qwg(h, manning_n, ws, thetarad, S, Qw_target):
 
 #function calculate new width of sediment based on soil depth, bank angle, and bedrock width
 def calc_ws(mg, thetarad):
-    mg.at_node['channel_sediment__width'][:] = mg.at_node['channel_bedrock__width'][:] 
-    + 2 * mg.at_node['soil__depth'][:] / np.tan(thetarad)
+    mg.at_node['channel_sediment__width'][mg.core_nodes] = mg.at_node['channel_bedrock__width'][mg.core_nodes] 
+    + ( 2 * mg.at_node['soil__depth'][mg.core_nodes] / np.tan(thetarad))
     
 
 
@@ -542,7 +544,8 @@ for of in out_fields:
 
 #%% Main model loop
 
-
+if nx == ny:
+    outlet=nx+1
 
 elapsed_time = 0
 elapsed_time_yrs= 0
@@ -690,7 +693,7 @@ for i in range(nts):
             ds[of][ds_ind, :, :] = mg['node'][of].reshape(mg.shape)
             
         print(elapsed_time_yrs, time_diff_minutes )
-        print ("wr=","{0:0.2f}".format(round(wr[21], 2)), "h=", "{0:0.2f}".format(round(h[21], 2)), "wwa=", "{0:0.2f}".format(round(w_avg[21], 2)))
+        print ("wr=","{0:0.2f}".format(round(wr[outlet], 2)), "h=", "{0:0.2f}".format(round(h[outlet], 2)), "wwa=", "{0:0.2f}".format(round(w_avg[outlet], 2)), "H=", "{0:0.2f}".format(round(mg.at_node["soil__depth"][outlet], 2)))
         print('mean elev', np.mean(z[mg.core_nodes]))
         
         #write output to netcdf file
