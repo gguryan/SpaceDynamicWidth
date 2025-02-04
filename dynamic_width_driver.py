@@ -44,8 +44,8 @@ inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
-ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
-#ds_file_out = 'C:/Users/grace/Desktop/Projects/output/Qcalc_test.nc'
+#ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
+ds_file_out = 'C:/Users/grace/Desktop/Projects/output/newQ_200kyr_lowKbank2.nc'
 
 #TODO - try model run with thresholds from original lague model
 
@@ -56,7 +56,7 @@ sec_per_yr =  60 * 60 * 24 * 365
 
 #Model time in years
 #space_runtime = 1600000
-space_runtime = 100000 #just for testing purposes
+space_runtime = 200000 #just for testing purposes
 space_runtime_sec = space_runtime * sec_per_yr
 
 
@@ -113,13 +113,13 @@ space_uplift_sec = Upliftrate_mperyr / sec_per_yr
 v_seconds = V_mperyr / sec_per_yr
 
 #thresholds
-# sp_crit_br = inputs["omegacr"]
-# sp_crit_sed = inputs["omegacs"]
+sp_crit_br = inputs["omegacr"]
+sp_crit_sed = inputs["omegacs"]
 omegacbank = inputs["omegacbank"]
 
-sp_crit_br = .03 * .12  #tau x estimated velocity (.12 m3/sec for 20x20x100 grid)
-sp_crit_sed = sp_crit_br 
-omegacbank = sp_crit_br * 1.15 #From phillips et al 2022
+# sp_crit_br = .03 * .12  #tau x estimated velocity (.12 m3/sec for 20x20x100 grid)
+# sp_crit_sed = sp_crit_br 
+# omegacbank = sp_crit_br * 1.15 #From phillips et al 2022
 
 
 # Other variables, generally won't change:
@@ -557,7 +557,7 @@ upper_bound = dx-1 #should probably be lower, doesn't matter in current paramete
 
 #for i in range(10000):
 for i in range(nts):
-#for i in range(5):
+#for i in range(1):
 
 
     
@@ -611,7 +611,7 @@ for i in range(nts):
     
 
     #calculate width coefficient for channel bank
-    mg.at_node['psi_bank'][mg.core_nodes] = rhow * g * Fw[mg.core_nodes] / 2 * (wws[mg.core_nodes] / h[mg.core_nodes] * np.sin(thetarad) - np.cos(thetarad))
+    mg.at_node['psi_bank'][mg.core_nodes] = (rhow * g *  (Fw[mg.core_nodes] / 2)) * (((wws[mg.core_nodes] / h[mg.core_nodes]) * np.sin(thetarad)) - np.cos(thetarad))
     
     
     #Multiply erodibilities by width coefficient
@@ -622,13 +622,13 @@ for i in range(nts):
     
     #Update discharge field to m2/s before calculation erosion with space 
     mg.at_node['surface_water__discharge'][:] = q_norm[:] 
-    
+
     #erode with space
     space.run_one_step(dt=space_dt_sec)
     
     
     #Calculate bank erosion rate in m/sec
-    bank_er[mg.core_nodes] = mg.at_node['K_bank'][mg.core_nodes] * mg.at_node['psi_bank'][mg.core_nodes] * q_norm[mg.core_nodes] * (S[mg.core_nodes]**n_sp)- omegacbank
+    bank_er[mg.core_nodes] = (mg.at_node['K_bank'][mg.core_nodes] * mg.at_node['psi_bank'][mg.core_nodes] * q_norm[mg.core_nodes] * (S[mg.core_nodes]**n_sp)) - omegacbank
     
     
     #Use getter to update bedrock erosion rate from space 
@@ -691,6 +691,7 @@ for i in range(nts):
             
         print(elapsed_time_yrs, time_diff_minutes )
         print ("wr=","{0:0.2f}".format(round(wr[21], 2)), "h=", "{0:0.2f}".format(round(h[21], 2)), "wwa=", "{0:0.2f}".format(round(w_avg[21], 2)))
+        print('mean elev', np.mean(z[mg.core_nodes]))
         
         #write output to netcdf file
         ds.to_netcdf(ds_file_out)
@@ -708,6 +709,7 @@ for i in range(nts):
 plt.figure()
 imshow_grid(mg, 'channel_bedrock__width', colorbar_label='Channel Width(m)')   
 plt.title('Final Channel Width') 
+plt.show()
 
 #%%
 
@@ -715,12 +717,16 @@ plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')   
 plt.title('Final Topo') 
     
-
+plt.show()
 #%%
 
 plt.figure()
 imshow_grid(mg, 'soil__depth', colorbar_label='Sed Thickness (m)')   
 plt.title('Final Sediment Thickness') 
+plt.show()
+
+
+
 
 #%%
 

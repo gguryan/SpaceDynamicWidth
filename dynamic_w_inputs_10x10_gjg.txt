@@ -32,9 +32,9 @@ U_initguess : 2.75 #initial guess to start iterating for velocity
 
 
 
-Kr : 1.5e-14  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
+Kr : 1.0e-11  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
 Ks : 1e-15   # Sediment entrainability, units 1/m
-Kbank : 1e-14  # Try order of magnitude smaller than Kr
+Kbank : 1.5e-11  # Try order of magnitude smaller than Kr
 
 
 n_sp: 1                  # Exponent on slope! Not Manning's n
