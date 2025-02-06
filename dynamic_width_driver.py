@@ -260,7 +260,8 @@ DA = mg.at_node['drainage_area']
 #Runoff rate is in m/second
 #runoff_calc = Q_calc / DA[nx+1]
 
-runoff_calc = 3/sec_per_yr
+runoff_mperyr = 3
+runoff_calc = runoff_mperyr/sec_per_yr
 
 fa = PriorityFloodFlowRouter(mg, runoff_rate=runoff_calc) 
 fa.run_one_step()
@@ -540,6 +541,7 @@ for of in out_fields:
     ds[of][0, :, :] = mg['node'][of].reshape(mg.shape)
 
 
+ds.attrs.update({"runoff_mperyr": runoff_mperyr})
     
 
 #%% Main model loop
@@ -734,3 +736,8 @@ plt.show()
 #%%
 
 wdr[mg.core_nodes] = wr[mg.core_nodes] / h[mg.core_nodes]
+
+#%%
+
+topo_mean = ds['topographic__elevation'].mean(dim=["x", "y"])
+plt.plot(topo_mean["time"], topo_mean)

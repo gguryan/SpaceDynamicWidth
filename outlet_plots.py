@@ -47,7 +47,9 @@ from landlab.components import (FlowAccumulator,
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sameK.nc'
 
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed3.nc'
-ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x.nc'
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x.nc'
+
+ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
 
 ds = xr.open_dataset(ds_file) 
 
@@ -205,3 +207,49 @@ Kbank = ds.attrs['Kbank']
 
 check = (Kbank>Kbr)
 print('K bank is bigger than Kbr =', check)
+
+#%%
+
+def generate_summary(ds):
+    
+    max_time = ds.time.max().values
+    
+    
+    summary_dict = {}
+    
+    Kbr = ds.attrs['Kr']
+    Kbank = ds.attrs['Kbank']
+    Ksed = ds.attrs['Ks']
+    grid_area = ds.attrs['nx'] * ds.attrs['ny'] * ds.attrs['dx']
+    Kb_ratio = Kbank/Kbr
+    V = ds.attrs['V_mperyr']
+    
+    runoff_rate = ds.attrs['runoff_mperyr']
+    
+    
+    #data variables to average
+    vars_to_avg = ['topographic__elevation', 
+                   'bank_erosion__rate' 
+                   'bedrock_erosion__rate',
+                   'soil__depth',
+                   'channel_bedrock__width',
+                   'flow__depth']
+  
+    for var in vars_to_avg:
+        
+        da = ds[var].sel(time=max_time)
+        
+        var_mean = da.mean()
+        
+        summary_dict.update({ var : var_mean})
+    
+    wdr = ds['channel_bedrock__width'].sel(time=max_time) / ds['flow__depth'].sel(time=max_time) 
+        
+
+#%%
+
+
+    
+    
+    
+    
