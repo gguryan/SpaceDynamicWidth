@@ -45,9 +45,13 @@ inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 
 #path to save netcdf file to 
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
-ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
+#ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
+
+
 
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_Ke-13.nc'''
+
+#ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc'
 
 #TODO - try model run with thresholds from original lague model
 
@@ -711,8 +715,16 @@ for i in range(nts):
     
 #%%
 
+narrow_x = mg.x_of_node[too_narrow]
+narrow_y = mg.y_of_node[too_narrow]
+
+
+
+#%%
+
 plt.figure()
 imshow_grid(mg, 'channel_bedrock__width', colorbar_label='Channel Width(m)')   
+plt.plot(narrow_x, narrow_y, 'rs')
 plt.title('Final Channel Width') 
 plt.show()
 
@@ -730,6 +742,38 @@ imshow_grid(mg, 'soil__depth', colorbar_label='Sed Thickness (m)')
 plt.title('Final Sediment Thickness') 
 plt.show()
 
+#%%
+
+plt.figure()
+imshow_grid(mg, 'topographic__steepest_slope', colorbar_label='Slope', cmap='viridis')   
+plt.title('Final Slope') 
+plt.show()
+
+#%%
+
+zero_slope = np.where(mg.at_node['topographic__steepest_slope'] == 0)[0]
+flat_x = mg.x_of_node[zero_slope]
+flat_y = mg.y_of_node[zero_slope]
+
+
+from matplotlib.colors import ListedColormap
+
+# Create a custom colormap based on 'viridis'
+viridis = plt.cm.get_cmap('viridis', 256)
+new_colors = viridis(np.linspace(0, 1, 256))
+
+# Set the color for zero values to red
+new_colors[0] = [1, 0, 0, 1]  # RGBA for red (fully opaque)
+
+# Create a new colormap
+custom_cmap = ListedColormap(new_colors)
+
+
+plt.figure()
+imshow_grid(mg, 'topographic__steepest_slope', colorbar_label='Slope', cmap=custom_cmap)  
+#plt.plot(flat_x, flat_y, 'rs') 
+plt.title('Final Slope') 
+plt.show()
 
 
 
@@ -739,5 +783,8 @@ wdr[mg.core_nodes] = wr[mg.core_nodes] / h[mg.core_nodes]
 
 #%%
 
+
 topo_mean = ds['topographic__elevation'].mean(dim=["x", "y"])
 plt.plot(topo_mean["time"], topo_mean)
+plt.title('Mean Elevation over Time')
+plt.show()

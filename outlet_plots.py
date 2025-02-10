@@ -35,6 +35,7 @@ from landlab.components import (FlowAccumulator,
                                 Space, 
                                 PriorityFloodFlowRouter, 
                                 SpaceLargeScaleEroder)
+import os
 
 
 #ds_file = 'C:/Users/grace/Desktop/Projects/output/newQ_200kyr_lowKbank2.nc'
@@ -49,19 +50,31 @@ from landlab.components import (FlowAccumulator,
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed3.nc'
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x.nc'
 
-ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
+
+#ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed3.nc'
+
+#ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed3.nc'
+
+ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_1e-11.nc'
+
+
+#ds_file = "C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc"
+
 
 ds = xr.open_dataset(ds_file) 
 
 #%%
 
-plot_time = 100000
+plot_time = 200000
 
 ds_attrs = ds.attrs
 
 dx = ds.attrs['dx']
 
 outlet = [100, 100] 
+
+
 
 
 
@@ -136,9 +149,32 @@ plot_xy_timeseries(ds, variables=data_vars_m, x_coord=dx, y_coord=dx)
 
 #%%
 
+xy_coords = [(100, 100), (4500, 3700), (3900, 8000)]
+
+x_coords= [100, 4500, 3900]
+y_coords = [100, 3700, 8000]
+
+
+
+plt.figure()
+
 z = ds.topographic__elevation.sel(time=plot_time)
-z.plot()
+z.plot(cmap='pink')
+
+
+# for x_i, y_i, c in zip(x, y, colors):
+#     plt.plot(x_i, y_i, 'o', color=c, markersize=1)  # This is the correct syntax
+    
+    
+# Plot points individually for different colors
+plt.plot(x_coords[0], y_coords[0], 'o', color='tab:blue', markersize=3)  
+plt.plot(x_coords[1], y_coords[1], 'o', color='orange', markersize=3)  
+plt.plot(x_coords[2], y_coords[2], 'o', color='green', markersize=3)  
+
+#plt.plot(x, y, 'rs', markersize=1)
 plt.show()
+
+
 
 #%%
 
@@ -196,9 +232,10 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
     
 #%%
 
-xy_coords = [(100, 100), (600, 600), (1200, 1200)]
+
 
 plot_xy_timeseries_multi(ds, data_vars_m, xy_coords)
+
 
 #%%
 
