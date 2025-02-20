@@ -51,38 +51,171 @@ import os
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x.nc'
 
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
+#ds_file='C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr2_150_nx50_2.nc' #didn't work
 
 #ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed3.nc'
 
-#ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed3.nc'
 
-ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_1e-11.nc'
+#ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_1e-11.nc'
 
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc' #Failed
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc' #Failed
+
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_1e-11.nc' #THIS ONE WORKS
+
+
+#ds_file='C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr15_nx50_ctrl.nc'
 
 #ds_file = "C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc"
 
+#%%
 
-ds = xr.open_dataset(ds_file) 
+ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05.nc'
+ds1 = xr.open_dataset(ds_file)
+
+ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed.nc'
+ds2 = xr.open_dataset(ds_file) 
 
 #%%
 
-plot_time = 200000
+# plot_time = 500000
 
-ds_attrs = ds.attrs
+# 
 
-dx = ds.attrs['dx']
+# dx = ds1.attrs['dx']
+# nx=ds1.attrs['nx']
 
-outlet = [100, 100] 
+# outlet = [100, 100] 
+
+# outlet_id = nx+1
 
 
 
-
-
-thetarad = np.radians(ds.attrs['theta_deg'])
+# thetarad = np.radians(ds1.attrs['theta_deg'])
 
 #%%
 
-def plot_xy_timeseries(dataset, variables, x_coord, y_coord):
+def xr_to_mg(ds, plot_time):
+    
+    ds_attrs = ds.attrs
+    
+    nx = ds_attrs['nx']
+    ny = ds_attrs['ny']
+    dx = ds_attrs['dx']
+    
+    data_vars_dict = ds.data_vars
+
+    data_vars_list = list(data_vars_dict)
+    
+    mg = RasterModelGrid((nx, ny), dx)
+    
+    for var_name in data_vars_list:
+        
+                
+        #z = ds.topographic__elevation.sel(time=plot_time)
+        #z = mg.add_field("topographic__elevation", z, at="node")
+        
+        var_data = ds[var_name].sel(time=plot_time, method='nearest')
+        mg.add_field(var_name, var_data, at="node")
+    
+    #reset outlet elevation to zero
+    mg.at_node['topographic__elevation'][0] = 0
+    
+    return mg
+
+#%%
+
+plot_time = 500000
+
+
+
+# plt.figure()
+# imshow_grid(mg1, 'channel_bedrock__width', colorbar_label='Channel Width(m)')   
+# plt.title(f'Channel Width at {plot_time}') 
+# plt.show()
+
+
+
+
+#%%
+
+def plot_channel_prf(ds, plot_time, model_name):
+    
+    '''
+    ds: xarray dataset with model output
+    plot_time : int, plot time in years, must be in intervals of 1000 years
+    model name : string,  model name to use on plot titles, ('ie no sediment')  
+    '''
+    
+    ds_attrs = ds.attrs
+
+    mg = xr_to_mg(ds, plot_time)
+
+    nx = ds1.attrs['nx']
+    
+    #run flow accumulator for channel profiler purposes
+    fa_temp = PriorityFloodFlowRouter(mg) 
+    fa_temp.run_one_step()
+
+
+    prf = ChannelProfiler(
+        mg,
+        main_channel_only=True,
+    )
+
+    prf.run_one_step()
+
+    ordered_dict = prf.data_structure
+    
+    #get the first watershed from prf ordered dict
+    #watershed is a tuple with two elements: outlet ID and a nested dict 
+    watershed = next(iter(ordered_dict.items()))
+    
+    #watershed data is the nested dict
+    outlet_ID, watershed_data = watershed
+    
+    
+    #nested_dict = watershed_data
+    #channel_key = next(iter(nested_dict))
+    channel_dict = watershed_data
+    channel_key = next(iter(channel_dict))
+    
+    
+    #get node ids of all nodes in the main channel
+    ids_array = channel_dict[channel_key]['ids']
+
+
+    #Get outlet, midpoint, and upstream end of main channel
+    first_value = ids_array[1]
+    middle_value = ids_array[len(ids_array) // 2]
+    last_value = ids_array[-3]
+
+    x_coords = mg.x_of_node[[first_value, middle_value, last_value]]
+    y_coords = mg.y_of_node[[first_value, middle_value, last_value]]
+
+    xy_coords = list(zip(x_coords, y_coords))
+
+    fig = plt.figure()
+    #imshow_grid(mg1, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')   
+    prf.plot_profiles_in_map_view()
+    plt.title(f'Main Channel, {model_name}, Time={plot_time/1000} kyr') 
+    plt.plot(x_coords[0], y_coords[0], 'o', color='tab:blue', markersize=3)  
+    plt.plot(x_coords[1], y_coords[1], 'o', color='orange', markersize=3)  
+    plt.plot(x_coords[2], y_coords[2], 'o', color='green', markersize=3)  
+
+    plt.show()
+    
+    return fig, xy_coords
+
+#%%
+
+fig, xy_coords = plot_channel_prf(ds1, plot_time, 'No Sediment')
+
+
+fig2, xy_coords2 = plot_channel_prf(ds2, plot_time, 'With Sediment')
+#%%define functions plot_xy_timeseries and calc_channel_dims
+
+def plot_xy_timeseries(ds, variables, x_coord, y_coord):
     """
     Plot time series for specified variables at a specific xy location.
     
@@ -101,10 +234,13 @@ def plot_xy_timeseries(dataset, variables, x_coord, y_coord):
     Kr = ds.attrs['Kr']
     Kbank = ds.attrs['Kbank']
     
+
+    
+    
     
     # Create a figure with subplots
     fig, axes = plt.subplots(len(variables), 1, figsize=(10, 4*len(variables)), 
-                              sharex=True)
+                              sharex=True, dpi=300)
     
     # If only one variable, convert axes to list for consistent indexing
     if len(variables) == 1:
@@ -113,10 +249,10 @@ def plot_xy_timeseries(dataset, variables, x_coord, y_coord):
     # Plot each variable
     for i, var_name in enumerate(variables):
         # Extract data at specific xy location
-        var_data = dataset[var_name].sel(x=x_coord, y=y_coord, method='nearest')
+        var_data = ds[var_name].sel(x=x_coord, y=y_coord, method='nearest')
         
         # Get long name for title (use var_name as fallback)
-        long_name = dataset[var_name].attrs.get('long_name', var_name)
+        long_name = ds[var_name].attrs.get('long_name', var_name)
         
         # Plot the time series
         var_data.plot(ax=axes[i], label=long_name)
@@ -127,52 +263,64 @@ def plot_xy_timeseries(dataset, variables, x_coord, y_coord):
     plt.tight_layout()
     plt.show()
 
+
+def calc_channel_dims(ds):
+    
+    #Calculate additional channel dimensions based on geometric relationships 
+    
+    thetadeg = ds.attrs['theta_deg']
+    thetarad = np.radians(thetadeg)
+   
+    #width depth ratio
+    wdr = ds['channel_bedrock__width'] / ds['flow__depth']
+    ds['width_depth__ratio'] = wdr
+    ds['width_depth__ratio'].attrs['long_name'] = 'Bedrock Width/Depth Ratio'
+
+    ds['water_surface__width'] = ds['channel_sediment__width'] + (2 * (ds['flow__depth'] / np.tan(thetarad)))
+    ds['water_surface__width'].attrs['long_name'] = 'Water Surface Width'
+    ds['flow__depth'].attrs['long_name'] = 'Flow Depth'
+    
+    return ds
+
 #%%
 
+#Calculate additional channel dimensions
+var_list1 = list(ds1.variables)
+ds1 = calc_channel_dims(ds1)
 
-   
-#wws[mg.core_nodes] = mg.at_node['channel_sediment__width'][mg.core_nodes] + ((2 * h[mg.core_nodes]) / np.tan(thetarad))
-wws = ds['channel_sediment__width'] + (2 * (ds['flow__depth'] / np.tan(thetarad)))
-wdr = ds['channel_bedrock__width'] / ds['flow__depth']
 
-ds['width_depth__ratio'] = wdr
-ds['width_depth__ratio'].attrs['long_name'] = 'Bedrock Width/Depth Ratio'
+var_list2 = list(ds1.variables)
+ds2 = calc_channel_dims(ds2)
 
-ds['water_surface__width'] = wws
-ds['water_surface__width'].attrs['long_name'] = 'Water Surface Width'
-ds['flow__depth'].attrs['long_name'] = 'Flow Depth'
+
+
+#%%
 
 data_vars_m = ['channel_bedrock__width', 'flow__depth',  'width_depth__ratio', 'topographic__elevation', 'soil__depth' ]
 data_vars_rates = ['bank_erosion__rate', 'bedrock_erosion__rate']
     
-plot_xy_timeseries(ds, variables=data_vars_m, x_coord=dx, y_coord=dx)
+#plot_xy_timeseries(ds1, variables=data_vars_m, x_coord=dx+2, y_coord=dx+2)
 
 #%%
 
-xy_coords = [(100, 100), (4500, 3700), (3900, 8000)]
 
-x_coords= [100, 4500, 3900]
-y_coords = [100, 3700, 8000]
+# plt.figure()
 
-
-
-plt.figure()
-
-z = ds.topographic__elevation.sel(time=plot_time)
-z.plot(cmap='pink')
+# z = ds1.topographic__elevation.sel(time=plot_time)
+# z.plot(cmap='pink')
 
 
-# for x_i, y_i, c in zip(x, y, colors):
-#     plt.plot(x_i, y_i, 'o', color=c, markersize=1)  # This is the correct syntax
+# # for x_i, y_i, c in zip(x, y, colors):
+# #     plt.plot(x_i, y_i, 'o', color=c, markersize=1)  # This is the correct syntax
     
     
-# Plot points individually for different colors
-plt.plot(x_coords[0], y_coords[0], 'o', color='tab:blue', markersize=3)  
-plt.plot(x_coords[1], y_coords[1], 'o', color='orange', markersize=3)  
-plt.plot(x_coords[2], y_coords[2], 'o', color='green', markersize=3)  
+# # Plot points individually for different colors
+# plt.plot(x_coords[0], y_coords[0], 'o', color='tab:blue', markersize=3)  
+# plt.plot(x_coords[1], y_coords[1], 'o', color='orange', markersize=3)  
+# plt.plot(x_coords[2], y_coords[2], 'o', color='green', markersize=3)  
 
-#plt.plot(x, y, 'rs', markersize=1)
-plt.show()
+# #plt.plot(x, y, 'rs', markersize=1)
+# plt.show()
 
 
 
@@ -183,7 +331,7 @@ plt.show()
 #plot_xy_timeseries(ds, variables=data_vars_m, x_coord=1200, y_coord=1200)
 
 
-#%%
+#%%define function plot_xy_timeseries_multi
 
 def plot_xy_timeseries_multi(dataset, variables, xy_coords):
     """
@@ -199,12 +347,18 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
         List of (x, y) coordinate pairs to extract and plot
     """
     
+    font = 14
+    
     Kr = dataset.attrs['Kr']
     Kbank = dataset.attrs['Kbank']
     
     # Create a figure with subplots
-    fig, axes = plt.subplots(len(variables), 1, figsize=(10, 4*len(variables)), 
-                              sharex=True)
+    fig, axes = plt.subplots(len(variables), 1, figsize=(12, 5*len(variables)), 
+                              sharex=True, dpi=300)
+    
+    plt.rcParams['font.size'] = font  # Set the general font size
+    
+
     
     # If only one variable, convert axes to list for consistent indexing
     if len(variables) == 1:
@@ -226,24 +380,29 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
         axes[i].set_title(f'{long_name}, Kbank={Kbank}, Kbr={Kr}')
         axes[i].legend()
     
-    # Adjust layout and show plot
-    plt.tight_layout()
-    plt.show()
+    for ax in fig.axes:
+        ax.tick_params(axis='both', which='major', labelsize=font)
+        ax.set_xlabel('X Label', fontsize=font)
+        ax.set_ylabel('Y Label', fontsize=font)
+
+
+    
+    return fig, axes
     
 #%%
 
 
+fig, axes = plot_xy_timeseries_multi(ds1, data_vars_m, xy_coords)
 
-plot_xy_timeseries_multi(ds, data_vars_m, xy_coords)
+for ax in axes:
+        ax.axvline(x=200000, color='red', linestyle='--')
+
+plt.show()
+
+#plot_xy_timeseries_multi(ds2, data_vars_m, xy_coords2)
 
 
-#%%
 
-Kbr = ds.attrs['Kr']
-Kbank = ds.attrs['Kbank']
-
-check = (Kbank>Kbr)
-print('K bank is bigger than Kbr =', check)
 
 #%%
 

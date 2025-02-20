@@ -51,9 +51,11 @@ inputs = load_params('dynamic_w_inputs_layers.txt')
 
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_Ke-13.nc'''
 
-ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr15.nc'
+#ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr2_150.nc' #failed
 
 #ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc'
+
+ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed.nc'
 
 #TODO - try model run with thresholds from original lague model
 
@@ -116,6 +118,8 @@ H_star = inputs["Hstar"]
 V_mperyr = inputs["V_mperyr"]
 phi = inputs["porosity"]
 Ff = inputs["Ff"]
+
+soil_init = inputs['H_init']
 
 
 Upliftrate_mperyr = inputs['space_uplift']
@@ -195,6 +199,8 @@ z = np.zeros(mg.size('node'))
 mg.add_field('topographic__elevation',z, at='node')
 
 
+
+
 #add random roughness to topography
 random_field = 0.01 * np.random.randn(mg.size('node'))
 z += random_field - random_field.min()
@@ -215,19 +221,24 @@ mg.set_watershed_boundary_condition_outlet_id(0,
 
 imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 
-#%%
+#%%Plot initial topo
 
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Initial Topo')
 plt.show()
 
+mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.at_node["soil__depth"][:]
+
+
 #%%Configure litholayers
 
 #Set erodibility for each rock type
-lith_attrs = {'K_sp': {1: K_br, 2: K_br2, 3: (K_br/10)}}
+lith_attrs = {'K_sp': {1: K_br, 2: K_br2, 3: (K_br/10000)}}
 
-layer_depths = [125, 1000] #Make bottom layer super thick ]
+#lith_attrs_ctrl = {'K_sp': {1: K_br, 2: K_br, 3: (K_br/1000)}} #first try layers with same K to make sure everything is working
+
+layer_depths = [400, 1000] #Make bottom layer super thick ]
 
 layer_ids = [1,2] #3 only for when litholayers needs to deposit - if it needs this something is wrong
 
@@ -260,23 +271,40 @@ for i in range (fsc_nts):
     dz_ad[mg.core_nodes] = fsc_uplift * fsc_dt
     mg.at_node['topographic__elevation'] += dz_ad
     
+    
+    lith.dz_advection=dz_ad
+    
+    lith.run_one_step()
+    
+    if 3 in mg.at_node['rock_type__id']:
+        raise Exception("Litholayers is depositing material (rock type 3 detected)")
+    
     fa1.run_one_step()
     
     fsc.run_one_step(dt=fsc_dt)
     fsc_time += fsc_dt
-    
+
+lith_thick_fsc = lith.thickness[:]
+
+#%%
+mg.at_node['bedrock__elevation'][:] = mg.at_node['topographic__elevation'][:] - mg.at_node['soil__depth'][:]   
 
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Topo after FSC')
-plt.show()
 
 
-#%%Set up soil for SPACE
+# plt.figure()
+# imshow_grid(mg, 'rock_type__id', cmap='viridis')
+# plt.title('Lithology After FSC')
+
+# plt.figure()
+# imshow_grid(mg, K_sp_arr, cmap='viridis')
+# plt.title('K_sp after FSC')
 
 
+#%%Set up flow variables
 
-mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.at_node["soil__depth"][:]
 
 
 DA = mg.at_node['drainage_area']
@@ -287,7 +315,7 @@ DA = mg.at_node['drainage_area']
 #Runoff rate is in m/second
 #runoff_calc = Q_calc / DA[nx+1]
 
-runoff_mperyr = 3
+runoff_mperyr = inputs['runoff_mperyr']
 runoff_calc = runoff_mperyr/sec_per_yr
 
 fa = PriorityFloodFlowRouter(mg, runoff_rate=runoff_calc) 
@@ -405,6 +433,16 @@ ds = xr.Dataset(
                 
             }), 
         
+        'rock_type__id' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': '-',
+                'long_name': 'Rock Type ID',
+                
+            }),     
+        
+        
         'topographic__steepest_slope' : (
             ('time', 'y', 'x'),  # tuple of dimensions
             np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
@@ -413,6 +451,7 @@ ds = xr.Dataset(
                 'long_name': 'Topographic Steepest Slope',
                 
             }),     
+        
         
         'channel_bedrock__width' : (
             ('time', 'y', 'x'),  # tuple of dimensions
@@ -451,7 +490,9 @@ out_fields = ['topographic__elevation',
               'surface_water__discharge',
               'topographic__steepest_slope',
               'channel_bedrock__width', 
+              'rock_type__id',
               'soil__depth']
+
              
 
 
@@ -544,20 +585,19 @@ vel_est[mg.core_nodes] = (Qw[mg.core_nodes]/Ax[mg.core_nodes])
 
 #vel_est = np.divide(Qw[mg.core_nodes], Ax, out=np.zeros_like(wr[mg.core_nodes], dtype=float), where=Ax != 0)
 #%%
+plt.figure()
 imshow_grid(mg, 'surface_water__discharge')
 plt.title('Initial Q, m3/sec')
 plt.show()
+
 
 imshow_grid(mg, 'channel_bedrock__width')
 plt.title('Initial Channel Bedrock Width')
 plt.show()
 
-#%%
-
-imshow_grid(mg, 'flow__depth')
-plt.title('Initial Flow Depth')
-plt.show()
-
+# imshow_grid(mg, 'flow__depth')
+# plt.title('Initial Flow Depth')
+# plt.show()
 
 
 
@@ -569,6 +609,8 @@ for of in out_fields:
 
 
 ds.attrs.update({"runoff_mperyr": runoff_mperyr})
+
+
     
 
 #%% Main model loop
@@ -587,10 +629,9 @@ upper_bound = dx-1 #should probably be lower, doesn't matter in current paramete
 
 
 
-#for i in range(10000):
-for i in range(nts):
-#for i in range(1):
 
+for i in range(nts):
+#for i in range(1): #for troubleshooting
 
     
     #flow routing    
@@ -646,10 +687,9 @@ for i in range(nts):
     mg.at_node['psi_bank'][mg.core_nodes] = (rhow * g *  (Fw[mg.core_nodes] / 2)) * (((wws[mg.core_nodes] / h[mg.core_nodes]) * np.sin(thetarad)) - np.cos(thetarad))
     
     
-    #Update lithology
-    lith.run_one_step()
-    space.K_br = mg.at_node['K_sp']
+
     
+   
     
     #Multiply erodibilities by width coefficient
     space.K_br = mg.at_node['K_sp'][:] * mg.at_node['psi_bed'][:]
@@ -657,10 +697,10 @@ for i in range(nts):
     
 
     
-    
     #Update discharge field to m2/s before calculation erosion with space 
     mg.at_node['surface_water__discharge'][:] = q_norm[:] 
 
+    
     #erode with space
     space.run_one_step(dt=space_dt_sec)
     
@@ -677,13 +717,12 @@ for i in range(nts):
     dwrdt = 2 * ((bank_er[mg.core_nodes] / math.sin(thetarad)) - (bed_er[mg.core_nodes]/math.tan(thetarad)))
     
     
-    
     #print('width before updating', wr)
     #temp = dwrdt*space_dt_sec
     
     #TODO - problem is that dwrdt is way too big
     
-    #update channel bedrock width
+    #Update/erode channel bedrock width
     mg.at_node['channel_bedrock__width'][mg.core_nodes] += dwrdt * space_dt_sec
     
     #print('width after updating', wr)
@@ -706,9 +745,33 @@ for i in range(nts):
     dz_ad = np.zeros(mg.size('node'))
     dz_ad[mg.core_nodes] = space_uplift_sec * space_dt_sec
     mg.at_node['bedrock__elevation'] += dz_ad
-    
     lith.dz_advection=dz_ad
-  
+    
+        
+    
+    #temporarily change topogrpahic elevation to bedrock elevations so litholayers doesn't "see" soil
+    mg.at_node['topographic__elevation'][:] = mg.at_node['bedrock__elevation'][:]
+    
+    lith.run_one_step()
+    
+    #lith_elev_change = z - lith._last_elevation + dz_ad
+    
+    if 3 in mg.at_node['rock_type__id']:
+        raise Exception("Litholayers is depositing material (rock type 3 detected)")
+    
+    
+    #Recalculate topographic elevation to account for rock uplift
+    mg.at_node['topographic__elevation'][:] = \
+        mg.at_node['bedrock__elevation'][:] + mg.at_node['soil__depth'][:]
+    
+    #Update erodibilities
+    space.K_br = mg.at_node['K_sp']
+    
+    #Where rock type=2, bank erodibility and sediment erodibility change by the same factor as bedrock erodibility
+    mg.at_node['K_bank'][mg.at_node['rock_type__id'] == 2] = K_bank / K_ratio
+    mg.at_node['K_sed'][mg.at_node['rock_type__id'] == 2] = K_sed / K_ratio
+    
+    
     
     #save output, check how long code has been running
     if elapsed_time_yrs %save_interval== 0:
@@ -733,6 +796,10 @@ for i in range(nts):
     elapsed_time += space_dt_sec
     elapsed_time_yrs += space_dt_sec / sec_per_yr
     
+    if elapsed_time_yrs == 201000:
+        plt.figure()
+        imshow_grid(mg, 'rock_type__id', cmap='viridis')
+        plt.title('Lithology At 201 kyr')
 
 
     

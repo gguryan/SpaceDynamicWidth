@@ -39,7 +39,8 @@ from landlab.components import (FlowAccumulator,
 
 #%%inputs and outputs
 
-inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+#inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
+inputs = load_params('dynamic_w_inputs_layers.txt')
 #inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
@@ -47,7 +48,7 @@ inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
 
-
+ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/nx50_test.nc'
 
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_Ke-13.nc'''
 
