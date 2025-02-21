@@ -61,7 +61,7 @@ import os
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc' #Failed
 #ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc' #Failed
 
-#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_1e-11.nc' #THIS ONE WORKS
+ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_1e-11.nc' #THIS ONE WORKS
 
 
 #ds_file='C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr15_nx50_ctrl.nc'
@@ -70,11 +70,15 @@ import os
 
 #%%
 
-ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05.nc'
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed_v3.nc'
+#ds1 = xr.open_dataset(ds_file)
+
+
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr15_nx50_ctrl_4.nc'
 ds1 = xr.open_dataset(ds_file)
 
-ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed.nc'
-ds2 = xr.open_dataset(ds_file) 
+#ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05.nc'
+#ds1 = xr.open_dataset(ds_file) 
 
 #%%
 
@@ -188,7 +192,7 @@ def plot_channel_prf(ds, plot_time, model_name):
     #Get outlet, midpoint, and upstream end of main channel
     first_value = ids_array[1]
     middle_value = ids_array[len(ids_array) // 2]
-    last_value = ids_array[-3]
+    last_value = ids_array[-5]
 
     x_coords = mg.x_of_node[[first_value, middle_value, last_value]]
     y_coords = mg.y_of_node[[first_value, middle_value, last_value]]
@@ -209,10 +213,10 @@ def plot_channel_prf(ds, plot_time, model_name):
 
 #%%
 
-fig, xy_coords = plot_channel_prf(ds1, plot_time, 'No Sediment')
+fig, xy_coords = plot_channel_prf(ds1, plot_time, 'V=3.0 m/yr')
 
 
-fig2, xy_coords2 = plot_channel_prf(ds2, plot_time, 'With Sediment')
+#fig2, xy_coords2 = plot_channel_prf(ds2, plot_time, 'With Sediment')
 #%%define functions plot_xy_timeseries and calc_channel_dims
 
 def plot_xy_timeseries(ds, variables, x_coord, y_coord):
@@ -289,8 +293,8 @@ var_list1 = list(ds1.variables)
 ds1 = calc_channel_dims(ds1)
 
 
-var_list2 = list(ds1.variables)
-ds2 = calc_channel_dims(ds2)
+#var_list2 = list(ds1.variables)
+#ds2 = calc_channel_dims(ds2)
 
 
 
@@ -349,6 +353,10 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
     
     font = 14
     
+    sec_per_year = 3.154e7
+    dataset['bedrock_erosion__rate'] *= sec_per_year
+    dataset['bank_erosion__rate'] *= sec_per_year
+    
     Kr = dataset.attrs['Kr']
     Kbank = dataset.attrs['Kbank']
     
@@ -379,12 +387,6 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
         
         axes[i].set_title(f'{long_name}, Kbank={Kbank}, Kbr={Kr}')
         axes[i].legend()
-    
-    for ax in fig.axes:
-        ax.tick_params(axis='both', which='major', labelsize=font)
-        ax.set_xlabel('X Label', fontsize=font)
-        ax.set_ylabel('Y Label', fontsize=font)
-
 
     
     return fig, axes
@@ -392,14 +394,24 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
 #%%
 
 
-fig, axes = plot_xy_timeseries_multi(ds1, data_vars_m, xy_coords)
+fig, axes = plot_xy_timeseries_multi(ds1, data_vars_rates, xy_coords)
 
 for ax in axes:
         ax.axvline(x=200000, color='red', linestyle='--')
 
-plt.show()
-
+#for v0 and v1
+# axes[0].set_ylim([0, 5])
+# axes[1].set_ylim([0, 0.75])
+# axes[2].set_ylim([0, 9])
+# axes[3].set_ylim([0, 80])
 #plot_xy_timeseries_multi(ds2, data_vars_m, xy_coords2)
+
+# axes[0].set_ylim([0, 6])
+# axes[1].set_ylim([0, 0.75])
+# axes[2].set_ylim([0, 16])
+# axes[3].set_ylim([0, 80])
+
+#%%
 
 
 
@@ -445,7 +457,7 @@ def generate_summary(ds):
 #%%
 
 
+sec_per_year = 3.154e7
     
-    
-    
+
     

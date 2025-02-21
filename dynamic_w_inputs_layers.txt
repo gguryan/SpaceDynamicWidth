@@ -4,9 +4,9 @@
 
 #grid dimensions
 dx : 100 #m
-nx: 50
+nx: 50 
 ny: 50
-dt: 20
+dt: 20 #meters
 
 space_uplift : .001 #m/yr
 
