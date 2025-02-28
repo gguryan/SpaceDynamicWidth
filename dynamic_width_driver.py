@@ -45,6 +45,7 @@ inputs = load_params('dynamic_w_inputs_layers.txt')
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
+
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
 
@@ -53,6 +54,13 @@ ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/nx50_test
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_Ke-13.nc'''
 
 #ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc'
+
+#ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
+#ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_temp.nc'
+
+
+
+
 
 #TODO - try model run with thresholds from original lague model
 
@@ -63,7 +71,9 @@ sec_per_yr =  60 * 60 * 24 * 365
 
 #Model time in years
 #space_runtime = 1600000
+
 space_runtime = 200000 #just for testing purposes
+
 space_runtime_sec = space_runtime * sec_per_yr
 
 
@@ -109,9 +119,28 @@ n_sp = inputs["n_sp"]
 m_sp = inputs["m_sp"] #THIS MUST BE SET TO ONE, gets subsumed into new K calculation
 H_star = inputs["Hstar"]
 
+#sp_crit_br = inputs["omegacr"]
+#sp_crit_sed = inputs["omegacs"]
+#omegacbank = inputs["omegacbank"]
+
 V_mperyr = inputs["V_mperyr"]
 phi = inputs["porosity"]
 Ff = inputs["Ff"]
+
+
+
+sp_crit_br = 1.8 * .03 #avg velocity of regular model run * .03 (critical shields)
+sp_crit_sed = sp_crit_br
+omegacbank = sp_crit_br*1.2
+
+# sp_crit_br = 0
+# sp_crit_sed = 0
+# omegacbank = 0
+
+#replace inputs w/ updated values so they get saved to XR dataset 
+inputs["omegacr"] = sp_crit_br 
+inputs["omegacs"] = sp_crit_sed 
+inputs["omegacbank"] = omegacbank 
 
 
 Upliftrate_mperyr = inputs['space_uplift']
@@ -250,7 +279,13 @@ plt.title('Topo after FSC')
 plt.show()
 
 
-#%%Set up soil for SPACE
+S = mg.at_node['topographic__steepest_slope']
+
+plt.figure()
+imshow_grid(mg, S, colorbar_label='Slope')
+plt.title('Initial Slope')
+
+plt.show()
 
 
 
@@ -271,6 +306,7 @@ runoff_calc = runoff_mperyr/sec_per_yr
 fa = PriorityFloodFlowRouter(mg, runoff_rate=runoff_calc) 
 fa.run_one_step()
 
+
 #Initialize new flow accumulator for SPACE, discharge in m3/sec
 
 
@@ -284,6 +320,7 @@ S = mg.at_node['topographic__steepest_slope']
 
 wdr = np.zeros(mg.size('node'))
 wdr[mg.core_nodes] = 3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.15) 
+
 
 
 #%%
@@ -546,8 +583,17 @@ for of in out_fields:
     ds[of][0, :, :] = mg['node'][of].reshape(mg.shape)
 
 
+
 ds.attrs.update({"runoff_mperyr": runoff_mperyr})
     
+
+
+
+def check_channel_width(mg, wr_min):
+    narrow_indices = np.where(mg.at_node['channel_bedrock__width'] < wr_min)[0]
+    if len(narrow_indices) > 0:
+        raise ValueError(f"Channels are too narrow at indices: {narrow_indices}")
+
 
 #%% Main model loop
 
@@ -637,9 +683,20 @@ for i in range(1):
     space.run_one_step(dt=space_dt_sec)
     
     
+
     #Calculate bank erosion rate in m/sec
     bank_er[mg.core_nodes] = (mg.at_node['K_bank'][mg.core_nodes] * mg.at_node['psi_bank'][mg.core_nodes] * q_norm[mg.core_nodes] * (S[mg.core_nodes]**n_sp)) - omegacbank
-    
+
+    #Calculate bank erosion rate - original code
+    #mg.at_node['bank_erosion__rate'][:] = mg.at_node['K_bank'][:] * mg.at_node['psi_bank'][:] * mg.at_node['normalized__discharge_sec'][:] * (mg.at_node['topographic__steepest_slope'][:]**n_sp) - omegacbank
+
+    #Clip erosion rates to zero anywhere threshold isn't met 
+    mg.at_node['bank_erosion__rate'][:] = np.clip(
+    (mg.at_node['K_bank'][:] * mg.at_node['psi_bank'][:] * 
+    mg.at_node['normalized__discharge_sec'][:] * 
+    (mg.at_node['topographic__steepest_slope'][:]**n_sp)) - omegacbank, 
+    0, 
+    np.inf)
     
     #Use getter to update bedrock erosion rate from space 
     bed_er[mg.core_nodes] = space._Er[mg.core_nodes]
@@ -650,9 +707,10 @@ for i in range(1):
     
     
     
+
     #print('width before updating', wr)
     #temp = dwrdt*space_dt_sec
-    
+
     #TODO - problem is that dwrdt is way too big
     
     #update channel bedrock width
@@ -672,10 +730,12 @@ for i in range(1):
     if too_narrow.size > 0:
         raise Exception(f"Channel is too narrow at indices: {too_narrow}")
         
+
     #Check for nodes that are too wide
     too_wide = mg.core_nodes[wr[mg.core_nodes] > dx]
     if too_wide.size > 0:
         raise Exception(f"Channel is too wide at indices: {too_wide}")
+
     
     #Update channel sediment width, ws 
     mg.at_node['channel_sediment__width'][mg.core_nodes] = mg.at_node['channel_bedrock__width'][mg.core_nodes] + 2 * mg.at_node['soil__depth'][mg.core_nodes] / np.tan(thetarad)
@@ -712,8 +772,13 @@ for i in range(1):
     elapsed_time_yrs += space_dt_sec / sec_per_yr
     
 
+    #if elapsed_time_yrs == 600000:
+        #space_uplift_sec *= 2
+        #runoff_manual *= 2
 
-    
+
+
+  
 #%%
 
 narrow_x = mg.x_of_node[too_narrow]
@@ -729,19 +794,27 @@ plt.plot(narrow_x, narrow_y, 'rs')
 plt.title('Final Channel Width') 
 plt.show()
 
+
 #%%
+
 
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')   
 plt.title('Final Topo') 
+
     
 plt.show()
 #%%
+
+
+
+
 
 plt.figure()
 imshow_grid(mg, 'soil__depth', colorbar_label='Sed Thickness (m)')   
 plt.title('Final Sediment Thickness') 
 plt.show()
+
 
 #%%
 
@@ -789,3 +862,23 @@ topo_mean = ds['topographic__elevation'].mean(dim=["x", "y"])
 plt.plot(topo_mean["time"], topo_mean)
 plt.title('Mean Elevation over Time')
 plt.show()
+
+#%%
+
+#flow_vel = Qw / ( h + ((ws + (h/math.tan(thetarad)))) ) 
+
+flow_vel = Qw /  (h*(ws + (h / np.tan(thetarad))))
+
+
+#%%
+
+flow_max = np.nanmax(flow_vel)
+flow_mean = np.nanmean(flow_vel)
+
+print(flow_max, flow_mean)
+
+#%%
+
+
+#ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_test_ctrl.nc'
+#ds.to_netcdf(ds_file_out)

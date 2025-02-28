@@ -47,3 +47,5 @@ omegacbank: 0            # Unit stream power threshold for bank erosion
 
 porosity: 0               # phi in SPACE model paper
 Ff: 0                      # Fraction fines
+
+
