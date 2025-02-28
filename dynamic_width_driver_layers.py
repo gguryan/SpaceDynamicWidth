@@ -55,7 +55,7 @@ inputs = load_params('dynamic_w_inputs_layers.txt')
 
 #ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc'
 
-ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed.nc'
+ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed_v3.nc'
 
 #TODO - try model run with thresholds from original lague model
 
@@ -788,6 +788,8 @@ for i in range(nts):
         print ("wr=","{0:0.2f}".format(round(wr[outlet], 2)), "h=", "{0:0.2f}".format(round(h[outlet], 2)), "wwa=", "{0:0.2f}".format(round(w_avg[outlet], 2)), "H=", "{0:0.2f}".format(round(mg.at_node["soil__depth"][outlet], 2)))
         print('mean elev', np.mean(z[mg.core_nodes]))
         
+        
+        
         #write output to netcdf file
         ds.to_netcdf(ds_file_out)
         
@@ -796,10 +798,10 @@ for i in range(nts):
     elapsed_time += space_dt_sec
     elapsed_time_yrs += space_dt_sec / sec_per_yr
     
-    if elapsed_time_yrs == 201000:
-        plt.figure()
-        imshow_grid(mg, 'rock_type__id', cmap='viridis')
-        plt.title('Lithology At 201 kyr')
+    # if elapsed_time_yrs == 201000:
+    #     plt.figure()
+    #     imshow_grid(mg, 'rock_type__id', cmap='viridis')
+    #     plt.title('Lithology At 201 kyr')
 
 
     

@@ -566,8 +566,8 @@ upper_bound = dx-1 #should probably be lower, doesn't matter in current paramete
 
 
 #for i in range(10000):
-for i in range(nts):
-#for i in range(1):
+#for i in range(nts):
+for i in range(1):
 
 
     
@@ -704,7 +704,7 @@ for i in range(nts):
         print('mean elev', np.mean(z[mg.core_nodes]))
         
         #write output to netcdf file
-        ds.to_netcdf(ds_file_out)
+        #ds.to_netcdf(ds_file_out)
         
     
     #update elapsed time
