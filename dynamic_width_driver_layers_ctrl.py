@@ -39,28 +39,25 @@ from landlab.components import (FlowAccumulator,
 
 #%%inputs and outputs
 
-#inputs = load_params('dynamic_w_inputs_10x10_gjg.txt')
 inputs = load_params('dynamic_w_inputs_layers.txt')
 #inputs = load_params("C:/Users/grace/Desktop/Projects/SpaceDynamicWidth/dynamic_w_inputs_10x10_gjg.txt")
 #inputs = load_params('C:/Users/gjg882/Desktop/Code/SpaceDynamicWidth/dynamic_w_inputs.txt')
 
 #path to save netcdf file to 
-
 #ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/Qcalc_test_threshold2.nc'
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_kbank2x_nx100.nc'
 
-ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/nx50_test.nc'
+
 
 #ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_Ke-13.nc'''
 
+#ds_file_out = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_test_kr2_150.nc' #failed
+
 #ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_sed_nx100_5e-12.nc'
 
-#ds_file_out = 'C:/Users/gjg882/Desktop/Projects/SDW_Output/ModelOutput/SDW_20x20_e-14_2_highQ_sed.nc'
-#ds_file_out = 'C:/Users/grace/Desktop/Projects/output/threshold_temp.nc'
+#ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed_v3.nc'
 
-
-
-
+ds_file_out = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/dynamic_layers_ctrl.nc'
 
 #TODO - try model run with thresholds from original lague model
 
@@ -71,9 +68,7 @@ sec_per_yr =  60 * 60 * 24 * 365
 
 #Model time in years
 #space_runtime = 1600000
-
-space_runtime = 200000 #just for testing purposes
-
+space_runtime = 1000000 #just for testing purposes
 space_runtime_sec = space_runtime * sec_per_yr
 
 
@@ -107,8 +102,11 @@ U_initguess = inputs['U_initguess']  # Initial guess of avg velocity, in m/s, ju
 h_initguess = 1.0 #TODO probably want to change this later
 
 K_br = inputs["Kr"]
+K_ratio = inputs['K_ratio']
 K_sed = inputs["Ks"]
 K_bank = inputs["Kbank"]
+
+K_br2 = K_br/K_ratio
 
 #Try making things less erodible
 #K_br =  K_br / 2
@@ -119,28 +117,11 @@ n_sp = inputs["n_sp"]
 m_sp = inputs["m_sp"] #THIS MUST BE SET TO ONE, gets subsumed into new K calculation
 H_star = inputs["Hstar"]
 
-#sp_crit_br = inputs["omegacr"]
-#sp_crit_sed = inputs["omegacs"]
-#omegacbank = inputs["omegacbank"]
-
 V_mperyr = inputs["V_mperyr"]
 phi = inputs["porosity"]
 Ff = inputs["Ff"]
 
-
-
-sp_crit_br = 1.8 * .03 #avg velocity of regular model run * .03 (critical shields)
-sp_crit_sed = sp_crit_br
-omegacbank = sp_crit_br*1.2
-
-# sp_crit_br = 0
-# sp_crit_sed = 0
-# omegacbank = 0
-
-#replace inputs w/ updated values so they get saved to XR dataset 
-inputs["omegacr"] = sp_crit_br 
-inputs["omegacs"] = sp_crit_sed 
-inputs["omegacbank"] = omegacbank 
+soil_init = inputs['H_init']
 
 
 Upliftrate_mperyr = inputs['space_uplift']
@@ -220,6 +201,8 @@ z = np.zeros(mg.size('node'))
 mg.add_field('topographic__elevation',z, at='node')
 
 
+
+
 #add random roughness to topography
 random_field = 0.01 * np.random.randn(mg.size('node'))
 z += random_field - random_field.min()
@@ -240,12 +223,48 @@ mg.set_watershed_boundary_condition_outlet_id(0,
 
 imshow_grid(mg, mg.status_at_node, color_for_closed='blue')
 
-#%%
+#%%Plot initial topo
 
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Initial Topo')
 plt.show()
+
+mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.at_node["soil__depth"][:]
+
+
+
+#%%
+
+K_sed = K_br * 1.5
+
+
+K_br2 = K_br/2
+
+#Set erodibility for each rock type
+lith_attrs = {'K_sp': {1: K_br, 2: K_br2, 3: (K_br/10000)}}
+
+
+
+#lith_attrs_ctrl = {'K_sp': {1: K_br, 2: K_br, 3: (K_br/1000)}} #first try layers with same K to make sure everything is working
+
+layer_depths = [500, 2000] #Make bottom layer super thick ]
+
+layer_ids = [1,2] #3 only for when litholayers needs to deposit - if it needs this something is wrong
+
+
+lith = LithoLayers(mg, 
+                    layer_depths, 
+                    layer_ids,
+                    attrs=lith_attrs,
+                    layer_type='MaterialLayers',
+                    rock_id=3)
+
+lith.run_one_step()
+
+
+
+
 
 
 #%%Use FastscapeEroder component to develop initial drainage network
@@ -267,29 +286,40 @@ for i in range (fsc_nts):
     dz_ad[mg.core_nodes] = fsc_uplift * fsc_dt
     mg.at_node['topographic__elevation'] += dz_ad
     
+    
+    lith.dz_advection=dz_ad
+    
+    lith.run_one_step()
+    
+    if 3 in mg.at_node['rock_type__id']:
+        raise Exception("Litholayers is depositing material (rock type 3 detected)")
+    
     fa1.run_one_step()
     
     fsc.run_one_step(dt=fsc_dt)
     fsc_time += fsc_dt
-    
+
+lith_thick_fsc = lith.thickness[:]
+
+#%%
+mg.at_node['bedrock__elevation'][:] = mg.at_node['topographic__elevation'][:] - mg.at_node['soil__depth'][:]   
 
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')
 plt.title('Topo after FSC')
-plt.show()
 
 
-S = mg.at_node['topographic__steepest_slope']
+# plt.figure()
+# imshow_grid(mg, 'rock_type__id', cmap='viridis')
+# plt.title('Lithology After FSC')
 
-plt.figure()
-imshow_grid(mg, S, colorbar_label='Slope')
-plt.title('Initial Slope')
-
-plt.show()
+# plt.figure()
+# imshow_grid(mg, K_sp_arr, cmap='viridis')
+# plt.title('K_sp after FSC')
 
 
+#%%Set up flow variables
 
-mg.at_node["bedrock__elevation"] = mg.at_node["topographic__elevation"][:] - mg.at_node["soil__depth"][:]
 
 
 DA = mg.at_node['drainage_area']
@@ -300,12 +330,11 @@ DA = mg.at_node['drainage_area']
 #Runoff rate is in m/second
 #runoff_calc = Q_calc / DA[nx+1]
 
-runoff_mperyr = 3
+runoff_mperyr = inputs['runoff_mperyr']
 runoff_calc = runoff_mperyr/sec_per_yr
 
 fa = PriorityFloodFlowRouter(mg, runoff_rate=runoff_calc) 
 fa.run_one_step()
-
 
 #Initialize new flow accumulator for SPACE, discharge in m3/sec
 
@@ -322,8 +351,21 @@ wdr = np.zeros(mg.size('node'))
 wdr[mg.core_nodes] = 3 * (mg.at_node['surface_water__discharge'][mg.core_nodes]**0.15) 
 
 
+#%%
 
 
+space = SpaceLargeScaleEroder(mg,
+            K_sed =K_sed,
+            K_br = K_br,
+            F_f = Ff,
+            phi = phi,
+            H_star = H_star,
+            v_s = v_seconds,
+            m_sp = m_sp,
+            n_sp = n_sp,
+            sp_crit_sed = sp_crit_sed,
+            sp_crit_br = sp_crit_br,
+            discharge_field='surface_water__discharge')
 
 
 #%%
@@ -406,6 +448,16 @@ ds = xr.Dataset(
                 
             }), 
         
+        'rock_type__id' : (
+            ('time', 'y', 'x'),  # tuple of dimensions
+            np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
+            {
+                'units': '-',
+                'long_name': 'Rock Type ID',
+                
+            }),     
+        
+        
         'topographic__steepest_slope' : (
             ('time', 'y', 'x'),  # tuple of dimensions
             np.empty((out_count, mg.shape[0], mg.shape[1])),  # n-d array of data
@@ -414,6 +466,7 @@ ds = xr.Dataset(
                 'long_name': 'Topographic Steepest Slope',
                 
             }),     
+        
         
         'channel_bedrock__width' : (
             ('time', 'y', 'x'),  # tuple of dimensions
@@ -452,7 +505,9 @@ out_fields = ['topographic__elevation',
               'surface_water__discharge',
               'topographic__steepest_slope',
               'channel_bedrock__width', 
+              'rock_type__id',
               'soil__depth']
+
              
 
 
@@ -482,8 +537,6 @@ def calc_ws(mg, thetarad):
 #Exponent from Buckley et al 2024 fig 2A
 #their numbers are for bankfull width (not bedrock) - fine as starting point
 wr[mg.core_nodes] =  ((mg.at_node['drainage_area']/1e6)[mg.core_nodes] ** 0.5) #channel is wider than dx if anything greater than .28 is used
-
-
 
 
 # if (wr > dx).any():
@@ -547,33 +600,19 @@ vel_est[mg.core_nodes] = (Qw[mg.core_nodes]/Ax[mg.core_nodes])
 
 #vel_est = np.divide(Qw[mg.core_nodes], Ax, out=np.zeros_like(wr[mg.core_nodes], dtype=float), where=Ax != 0)
 #%%
+plt.figure()
 imshow_grid(mg, 'surface_water__discharge')
 plt.title('Initial Q, m3/sec')
 plt.show()
+
 
 imshow_grid(mg, 'channel_bedrock__width')
 plt.title('Initial Channel Bedrock Width')
 plt.show()
 
-#%%
-
-imshow_grid(mg, 'flow__depth')
-plt.title('Initial Flow Depth')
-plt.show()
-
-#%%
-
-area_br = mg.add_zeros('channel_bedrock__area', at='node')
-area_br[:] = wr[:] * dx
-
-
-area_sed = mg.add_zeros('channel_sediment__area', at='node')
-area_sed[:] = ws[:] * dx
-
-
-
-sed_vol = mg.add_zeros('sediment__volume', at='node')
-sed_vol[:] = H_soil * (dx**2) #calculate initial sediment volume
+# imshow_grid(mg, 'flow__depth')
+# plt.title('Initial Flow Depth')
+# plt.show()
 
 
 
@@ -584,32 +623,10 @@ for of in out_fields:
     ds[of][0, :, :] = mg['node'][of].reshape(mg.shape)
 
 
-
 ds.attrs.update({"runoff_mperyr": runoff_mperyr})
+
+
     
-
-
-
-def check_channel_width(mg, wr_min):
-    narrow_indices = np.where(mg.at_node['channel_bedrock__width'] < wr_min)[0]
-    if len(narrow_indices) > 0:
-        raise ValueError(f"Channels are too narrow at indices: {narrow_indices}")
-        
-#%%
-
-space = SpaceLargeScaleEroder(mg,
-            K_sed =K_sed,
-            K_br = K_br,
-            F_f = Ff,
-            phi = phi,
-            H_star = H_star,
-            v_s = v_seconds,
-            m_sp = m_sp,
-            n_sp = n_sp,
-            sp_crit_sed = sp_crit_sed,
-            sp_crit_br = sp_crit_br,
-            discharge_field='surface_water__discharge')
-
 
 #%% Main model loop
 
@@ -627,10 +644,9 @@ upper_bound = dx-1 #should probably be lower, doesn't matter in current paramete
 
 
 
-#for i in range(10000):
-#for i in range(nts):
-for i in range(1):
 
+for i in range(nts):
+#for i in range(1): #for troubleshooting
 
     
     #flow routing    
@@ -686,33 +702,27 @@ for i in range(1):
     mg.at_node['psi_bank'][mg.core_nodes] = (rhow * g *  (Fw[mg.core_nodes] / 2)) * (((wws[mg.core_nodes] / h[mg.core_nodes]) * np.sin(thetarad)) - np.cos(thetarad))
     
     
+
+    
+   
+    
     #Multiply erodibilities by width coefficient
     space.K_br = mg.at_node['K_sp'][:] * mg.at_node['psi_bed'][:]
     space.K_sed = mg.at_node['K_sed'][:] * mg.at_node['psi_bed'][:]
     
-    
+
     
     #Update discharge field to m2/s before calculation erosion with space 
     mg.at_node['surface_water__discharge'][:] = q_norm[:] 
 
+    
     #erode with space
     space.run_one_step(dt=space_dt_sec)
     
     
-
     #Calculate bank erosion rate in m/sec
     bank_er[mg.core_nodes] = (mg.at_node['K_bank'][mg.core_nodes] * mg.at_node['psi_bank'][mg.core_nodes] * q_norm[mg.core_nodes] * (S[mg.core_nodes]**n_sp)) - omegacbank
-
-    #Calculate bank erosion rate - original code
-    #mg.at_node['bank_erosion__rate'][:] = mg.at_node['K_bank'][:] * mg.at_node['psi_bank'][:] * mg.at_node['normalized__discharge_sec'][:] * (mg.at_node['topographic__steepest_slope'][:]**n_sp) - omegacbank
-
-    #Clip erosion rates to zero anywhere threshold isn't met 
-    mg.at_node['bank_erosion__rate'][:] = np.clip(
-    (mg.at_node['K_bank'][:] * mg.at_node['psi_bank'][:] * 
-    mg.at_node['normalized__discharge_sec'][:] * 
-    (mg.at_node['topographic__steepest_slope'][:]**n_sp)) - omegacbank, 
-    0, 
-    np.inf)
+    
     
     #Use getter to update bedrock erosion rate from space 
     bed_er[mg.core_nodes] = space._Er[mg.core_nodes]
@@ -722,36 +732,25 @@ for i in range(1):
     dwrdt = 2 * ((bank_er[mg.core_nodes] / math.sin(thetarad)) - (bed_er[mg.core_nodes]/math.tan(thetarad)))
     
     
-    
-
     #print('width before updating', wr)
     #temp = dwrdt*space_dt_sec
-
+    
     #TODO - problem is that dwrdt is way too big
     
-    #update channel bedrock width
+    #Update/erode channel bedrock width
     mg.at_node['channel_bedrock__width'][mg.core_nodes] += dwrdt * space_dt_sec
     
     #print('width after updating', wr)
     
-    # #Check for nodes that are too wide
-    # if (wr[mg.core_nodes] > dx).any():
-    #     raise Exception("Channel width is greater than one grid cell")
-        
-    # if (wr[mg.core_nodes] < wr_min).any():
-    #    raise Exception("Channel is too narrow")
-
     #Check for nodes that are too narrow
     too_narrow = mg.core_nodes[wr[mg.core_nodes] < wr_min]
     if too_narrow.size > 0:
         raise Exception(f"Channel is too narrow at indices: {too_narrow}")
         
-
     #Check for nodes that are too wide
     too_wide = mg.core_nodes[wr[mg.core_nodes] > dx]
     if too_wide.size > 0:
         raise Exception(f"Channel is too wide at indices: {too_wide}")
-
     
     #Update channel sediment width, ws 
     mg.at_node['channel_sediment__width'][mg.core_nodes] = mg.at_node['channel_bedrock__width'][mg.core_nodes] + 2 * mg.at_node['soil__depth'][mg.core_nodes] / np.tan(thetarad)
@@ -761,8 +760,33 @@ for i in range(1):
     dz_ad = np.zeros(mg.size('node'))
     dz_ad[mg.core_nodes] = space_uplift_sec * space_dt_sec
     mg.at_node['bedrock__elevation'] += dz_ad
+    lith.dz_advection=dz_ad
     
-  
+        
+    
+    #temporarily change topogrpahic elevation to bedrock elevations so litholayers doesn't "see" soil
+    mg.at_node['topographic__elevation'][:] = mg.at_node['bedrock__elevation'][:]
+    
+    lith.run_one_step()
+    
+    #lith_elev_change = z - lith._last_elevation + dz_ad
+    
+    if 3 in mg.at_node['rock_type__id']:
+        raise Exception("Litholayers is depositing material (rock type 3 detected)")
+    
+    
+    #Recalculate topographic elevation to account for rock uplift
+    mg.at_node['topographic__elevation'][:] = \
+        mg.at_node['bedrock__elevation'][:] + mg.at_node['soil__depth'][:]
+    
+    #Update erodibilities
+    space.K_br = mg.at_node['K_sp']
+    
+    #Where rock type=2, bank erodibility and sediment erodibility change by the same factor as bedrock erodibility
+    mg.at_node['K_bank'][mg.at_node['rock_type__id'] == 2] = K_bank / K_ratio
+    #mg.at_node['K_sed'][mg.at_node['rock_type__id'] == 2] = K_sed / K_ratio
+    
+    
     
     #save output, check how long code has been running
     if elapsed_time_yrs %save_interval== 0:
@@ -779,22 +803,23 @@ for i in range(1):
         print ("wr=","{0:0.2f}".format(round(wr[outlet], 2)), "h=", "{0:0.2f}".format(round(h[outlet], 2)), "wwa=", "{0:0.2f}".format(round(w_avg[outlet], 2)), "H=", "{0:0.2f}".format(round(mg.at_node["soil__depth"][outlet], 2)))
         print('mean elev', np.mean(z[mg.core_nodes]))
         
+        
+        
         #write output to netcdf file
-        #ds.to_netcdf(ds_file_out)
+        ds.to_netcdf(ds_file_out)
         
     
     #update elapsed time
     elapsed_time += space_dt_sec
     elapsed_time_yrs += space_dt_sec / sec_per_yr
     
+    # if elapsed_time_yrs == 201000:
+    #     plt.figure()
+    #     imshow_grid(mg, 'rock_type__id', cmap='viridis')
+    #     plt.title('Lithology At 201 kyr')
 
-    #if elapsed_time_yrs == 600000:
-        #space_uplift_sec *= 2
-        #runoff_manual *= 2
 
-
-
-  
+    
 #%%
 
 narrow_x = mg.x_of_node[too_narrow]
@@ -810,27 +835,19 @@ plt.plot(narrow_x, narrow_y, 'rs')
 plt.title('Final Channel Width') 
 plt.show()
 
-
 #%%
-
 
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')   
 plt.title('Final Topo') 
-
     
 plt.show()
 #%%
-
-
-
-
 
 plt.figure()
 imshow_grid(mg, 'soil__depth', colorbar_label='Sed Thickness (m)')   
 plt.title('Final Sediment Thickness') 
 plt.show()
-
 
 #%%
 
@@ -878,24 +895,3 @@ topo_mean = ds['topographic__elevation'].mean(dim=["x", "y"])
 plt.plot(topo_mean["time"], topo_mean)
 plt.title('Mean Elevation over Time')
 plt.show()
-
-#%%
-
-cores = mg.core_nodes
-
-#flow_vel = Qw / ( h + ((ws + (h/math.tan(thetarad)))) ) 
-
-flow_vel = Qw[cores] /  (h[cores] *(ws[cores]  + (h[cores]  / np.tan(thetarad))))
-
-
-#%%
-
-flow_max = np.nanmax(flow_vel)
-flow_mean = np.nanmean(flow_vel)
-
-print(flow_max, flow_mean)
-
-#%%
-
-
-

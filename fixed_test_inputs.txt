@@ -1,0 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar  3 21:14:43 2025
+
+@author: grace
+"""
+
+nx : 50
+ny : 50
+
+K_br_sed : 6.766372072667138e-05 #Calibrated K to use w/ sediment
+
+K_sed_factor : 1.5 #Multiply K br by this factor to set K of sediment 
+
+K_br_spm : 4.04850e-05 #Calibarted K to use w/ no sediment
+
+
+K_br_factor : 0.5 #Multiply K br by this factor to set K of second rock layer
+
+V_mperyr : 3.0

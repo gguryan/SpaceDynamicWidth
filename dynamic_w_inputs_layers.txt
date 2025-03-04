@@ -6,7 +6,7 @@
 dx : 100 #m
 nx: 50 
 ny: 50
-dt: 20 #meters
+dt: 20 #years
 
 space_uplift : .001 #m/yr
 
@@ -39,9 +39,9 @@ U_initguess : 2.75 #initial guess to start iterating for velocity
 Kr : 1.0e-12  # Rock erodibility, units 1/m. NOTE: Shobe et al. 2017 used 0.001 (typically), but psibed stream power coefficient likely should change this value.
 Ks : 1.0e-11   # Sediment entrainability, units 1/m
 Kbank : 1.5e-12  # Try order of magnitude smaller than Kr
-V_mperyr: 3.0        # Grace uses 1, 3, 5. Convert to m/s below
+V_mperyr: 0       # Grace uses 1, 3, 5. Convert to m/s below
 
-K_ratio : 0.5 #Erodibility contrast ratio for litholayers
+K_ratio : 2 #Erodibility contrast ratio for litholayers
 
 n_sp: 1                  # Exponent on slope! Not Manning's n
 m_sp: 1                  # Exponent on drainage area - set to 1 since its subsumed into new K calculation
