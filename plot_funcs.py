@@ -172,7 +172,7 @@ def calc_channel_dims(ds):
 
 
 
-def plot_xy_timeseries_multi(dataset, variables, xy_coords):
+def plot_xy_timeseries_multi(dataset, variables, xy_coords, vline=None):
     """
     Plot time series for specified variables at multiple xy locations.
     
@@ -201,7 +201,12 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
     
     plt.rcParams['font.size'] = font  # Set the general font size
     
-
+    legend_labels = ['outlet', 'midpoint', 'upstream']
+    
+    #draw line showing when lith changes
+    if vline is not None:
+        for ax in fig.axes:
+            ax.axvline(x=vline, color='red', linestyle='--')
     
     # If only one variable, convert axes to list for consistent indexing
     if len(variables) == 1:
@@ -213,15 +218,21 @@ def plot_xy_timeseries_multi(dataset, variables, xy_coords):
         long_name = dataset[var_name].attrs.get('long_name', var_name)
         
         # Plot time series for each coordinate
-        for x_coord, y_coord in xy_coords:
+        #for x_coord, y_coord in xy_coords:
+       
+        for (x_coord, y_coord), label in zip(xy_coords, legend_labels):
             # Extract data at specific xy location
             var_data = dataset[var_name].sel(x=x_coord, y=y_coord, method='nearest')
             
             # Plot the time series with a unique label
-            var_data.plot(ax=axes[i], label=f'({x_coord}, {y_coord})')
+            #var_data.plot(ax=axes[i], label=f'({x_coord}, {y_coord})')
+            var_data.plot(ax=axes[i], label=label)
         
-        axes[i].set_title(f'{long_name}, Kbank={Kbank}, Kbr={Kr}')
+        #axes[i].set_title(f'{long_name}, Kbank={Kbank}, Kbr={Kr}')
+        axes[i].set_title(f'{long_name}')
         axes[i].legend()
+        
+
         
     plt.show()
     

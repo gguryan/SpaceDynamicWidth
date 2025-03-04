@@ -391,7 +391,8 @@ out_fields = ['topographic__elevation',
               'bedrock_erosion__rate',
               'sediment_erosion__rate',
               'soil__depth',
-              'rock_type__id']
+              'rock_type__id',
+              'topographic__steepest_slope']
              
 
  
@@ -512,6 +513,7 @@ for i in range(nts):
     space.run_one_step(dt=space_dt)
     
     bed_er[mg.core_nodes] = space._Er[mg.core_nodes]
+    sed_er[mg.core_nodes] = space._Es[mg.core_nodes]
     
     
     #uplift the landscape 
@@ -559,9 +561,10 @@ for i in range(nts):
 
 
 
+
+
+
 #%%
-
-
 plt.figure()
 imshow_grid(mg, 'topographic__elevation', colorbar_label='Topographic Elevation (m)')   
 plt.title('Final Topo') 

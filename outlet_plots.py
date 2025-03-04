@@ -37,6 +37,9 @@ from landlab.components import (FlowAccumulator,
                                 SpaceLargeScaleEroder)
 import os
 
+
+#%%
+
 from plot_funcs import (xr_to_mg, 
                         plot_channel_prf, 
                         calc_channel_dims, 
@@ -96,17 +99,17 @@ from plot_funcs import (xr_to_mg,
 #ds1 = xr.open_dataset(ds_file) 
 
 
-#%%
-
 #ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_lowKbank.nc' #n "default", kbank = 1.5e-12, Kbr = 1e-12
 #ds_file = "C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/space_fixed_width_sed3.nc"
 #ds_file = "C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/space_fixed_width_sed3.nc"
+#ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed_v3.nc'
 
-ds_file = 'C:/Users/grace/Box/UT/Research/Dynamic Width/ModelOuptut/SDW_litholayers_ratio_05_sed_v3.nc'
+ds_file = 'C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/dynamic_layers_ctrl.nc'
+model_name = 'SDW'
 
 ds1 = xr.open_dataset(ds_file)
 
-
+sec_per_yr = 3.154e+7
 
 
 max_time = ds1.time.max().item()
@@ -117,18 +120,21 @@ plot_time = max_time
 
 #Calculate additional channel dimensions
 var_list1 = list(ds1.variables)
-#ds1 = calc_channel_dims(ds1)
+ds1 = calc_channel_dims(ds1)
 
 
 
 # var_list2 = list(ds1.variables)
 # ds2 = calc_channel_dims(ds2)
-#data_vars_m = ['channel_bedrock__width', 'flow__depth',  'width_depth__ratio', 'topographic__elevation', 'soil__depth' ] #data variables w/ units of L
-#data_vars_rates = ['bank_erosion__rate', 'bedrock_erosion__rate'] #data variables w/ units of L/T
+data_vars_dimensionless = ['topographic__steepest_slope', 'width_depth__ratio' ]
+data_vars_m = ['channel_bedrock__width', 'flow__depth',  'topographic__elevation', 'soil__depth' ] #data variables w/ units of L
+data_vars_rates = ['bank_erosion__rate', 'bedrock_erosion__rate'] #data variables w/ units of L/T
 
+ds1['bank_erosion__rate'] *= sec_per_yr
 
-data_vars_m = ['topographic__elevation', 'soil__depth' ] #data variables w/ units of L
-data_vars_rates = ['bedrock_erosion__rate'] #data variables w/ units of L/T
+ds1['bedrock_erosion__rate'] *= sec_per_yr
+#data_vars_m = ['topographic__elevation', 'soil__depth' ] #data variables w/ units of L
+#data_vars_rates = ['bedrock_erosion__rate'] #data variables w/ units of L/T
     
 
 #%%
@@ -136,16 +142,15 @@ data_vars_rates = ['bedrock_erosion__rate'] #data variables w/ units of L/T
 
 
 
-fig, xy_coords, mg, ref_node_ind = plot_channel_prf(ds1, max_time, 'No Sediment')
+fig, xy_coords, mg, ref_node_ind = plot_channel_prf(ds1, max_time, 'SDW w/ Sediment')
 
 #%%
 
 
-fig, axes = plot_xy_timeseries_multi(ds1, data_vars_rates, xy_coords)
+fig, axes = plot_xy_timeseries_multi(ds1, data_vars_rates, xy_coords, vline=300000)
 
-# #draw line at 200kyr when lith changes
-# for ax in axes:
-#         ax.axvline(x=200000, color='red', linestyle='--')
+
+
 
 #for v0 and v1
 # axes[0].set_ylim([0, 5])
@@ -163,8 +168,99 @@ fig, axes = plot_xy_timeseries_multi(ds1, data_vars_rates, xy_coords)
 #%%
 
 
-fig, axes = plot_xy_timeseries_multi(ds1, data_vars_m, xy_coords)
+fig, axes = plot_xy_timeseries_multi(ds1, data_vars_m, xy_coords, vline=300000)
 
+
+
+fig, axes = plot_xy_timeseries_multi(ds1, data_vars_dimensionless, xy_coords, vline=300000)
+
+#%%
+
+
+ds2 = xr.open_dataset('C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/space_fixed_width_sed_layers_50x50.nc')
+title2 = 'SPACE w/ sediment'
+fig, xy_coords2, mg2, ref_node_ind = plot_channel_prf(ds2, max_time, title2)
+
+
+ds3 = xr.open_dataset('C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/space_fixed_width_layers_50x50.nc')
+title_3 = 'SPACE, no sediment'
+fig, xy_coords3, mg3, ref_node_ind = plot_channel_prf(ds3, max_time, title2)
+
+
+#%%
+data_vars_rates_SPACE = ['bedrock_erosion__rate', 'sediment_erosion__rate']
+data_vars_dim_SPACE = ['topographic__steepest_slope']
+data_vars_m_SPACE = ['topographic__elevation', 'soil__depth']
+
+#%%
+
+#fig, axes = plot_xy_timeseries_multi(ds2, data_vars_rates_SPACE, xy_coords, vline=300000)
+fig, axes = plot_xy_timeseries_multi(ds2, data_vars_m_SPACE, xy_coords, vline=300000)
+#fig, axes = plot_xy_timeseries_multi(ds2, data_vars_dim_SPACE, xy_coords, vline=300000)
+
+
+
+
+#%%
+
+fig, axes = plot_xy_timeseries_multi(ds3, data_vars_rates_SPACE, xy_coords, vline=300000)
+fig, axes = plot_xy_timeseries_multi(ds3, data_vars_m_SPACE, xy_coords, vline=300000)
+fig, axes = plot_xy_timeseries_multi(ds3, data_vars_dim_SPACE, xy_coords, vline=300000)
+
+
+#%%
+
+ds4 = xr.open_dataset('C:/Users/gjg882/Box/UT/Research/Dynamic Width/ModelOuptut/newQ_200kyr_lowKbank.nc') #n "default", kbank = 1.5e-12, Kbr = 1e-12)
+
+
+
+#%%
+plt.figure(dpi=300)
+
+ds_list = [ds1, ds2, ds3, ds4]
+xy_mid = [2500, 1200]
+
+labels = ['SDW w/sed', 'SPACE w/ sed', 'SPACE no sed', 'SDW no sed (small grid)']
+
+
+# mid_topo_1 = ds1['topographic__elevation'].sel(x=xy_mid[0], y=xy_mid[1], method='nearest')
+# mid_topo_2 = ds2['topographic__elevation'].sel(x=xy_mid[0], y=xy_mid[1], method='nearest')
+# mid_topo_3 = ds3['topographic__elevation'].sel(x=xy_mid[0], y=xy_mid[1], method='nearest')
+
+
+for ds, label in zip(ds_list, labels):
+    var_data = ds['topographic__steepest_slope'].sel(x=xy_mid[0], y=xy_mid[1], method='nearest')
+    var_data.plot(label=label)
+
+plt.legend()
+plt.title('Slope @mid-channel node')
+
+#%%
+
+ds4['bedrock_erosion__rate'] *= sec_per_yr
+
+
+plt.figure()
+
+for ds, label in zip(ds_list, labels):
+    # Calculate the mean elevation across the entire grid at each timestep
+    var_data = ds['bedrock_erosion__rate'].mean(dim=['x', 'y'])
+    var_data.plot(label=label)
+
+plt.legend(loc = 'lower right')
+plt.ylabel('Mean Bedrock Erosion Rate')
+
+#%%
+
+last_z = var_data.sel(time=200000).item()
+print(last_z)
+
+
+#%%
+
+z_mean_2 = ds2['topographic__elevation'].mean(dim=['x', 'y'])
+last_z2 = z_mean_2.sel(time=200000).item()
+print(last_z2)
 
 
 #%%
